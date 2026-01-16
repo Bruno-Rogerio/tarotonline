@@ -143,6 +143,36 @@ export default function HomeContent({
     };
   }, []);
 
+  // Broadcast para sincronizar status entre todos os usuários (SEPARADO)
+  useEffect(() => {
+    const channel = supabase.channel("tarologos-status");
+
+    // Receber atualizações
+    channel
+      .on("broadcast", { event: "status-change" }, (payload) => {
+        const { tarologoId, status } = payload.payload;
+        setTarologos((prev) =>
+          prev.map((t) => {
+            if (t.id === tarologoId) {
+              const agora = Date.now();
+              return {
+                ...t,
+                status,
+                minutosRestantes: status === "ocupado" ? 30 : undefined,
+                proximaMudanca: agora + 999999999,
+              };
+            }
+            return t;
+          })
+        );
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // Salvar sempre que o estado mudar
   useEffect(() => {
     if (tarologos.length > 0) {
@@ -244,6 +274,33 @@ export default function HomeContent({
     }
   }
 
+  function mudarStatusTarologo(
+    tarologoId: string,
+    novoStatus: "disponivel" | "ocupado" | "indisponivel"
+  ) {
+    setTarologos((prev) =>
+      prev.map((t) => {
+        if (t.id === tarologoId) {
+          const agora = Date.now();
+          return {
+            ...t,
+            status: novoStatus,
+            minutosRestantes: novoStatus === "ocupado" ? 30 : undefined,
+            proximaMudanca: agora + 999999999,
+          };
+        }
+        return t;
+      })
+    );
+
+    // Broadcast para todos os clientes
+    supabase.channel("tarologos-status").send({
+      type: "broadcast",
+      event: "status-change",
+      payload: { tarologoId, status: novoStatus },
+    });
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-800 flex items-center justify-center">
@@ -296,6 +353,10 @@ export default function HomeContent({
               tarologo={tarologo}
               usuarioLogado={!!usuario}
               temMinutos={(usuario?.minutos_disponiveis || 0) > 0}
+              isAdmin={usuario?.tipo === "admin"}
+              onChangeStatus={(status) =>
+                mudarStatusTarologo(tarologo.id, status)
+              }
             />
           ))}
         </div>

@@ -198,15 +198,29 @@ export default function AdminPage() {
   async function aceitarConsulta(sessao: SessaoPendente) {
     setLoading(true);
 
-    // Atualizar sessão para em_andamento
+    // Pega o ID do admin na hora (garante que está atualizado)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert("Erro: Usuário não autenticado");
+      setLoading(false);
+      return;
+    }
+
+    console.log("👤 Aceitando consulta com admin_id:", user.id);
+
     const { error } = await supabase
       .from("sessoes")
       .update({
         status: "em_andamento",
-        admin_id: adminId,
+        admin_id: user.id, // Usa direto do user
         inicio: new Date().toISOString(),
       })
       .eq("id", sessao.id);
+
+    console.log("✅ Update resultado:", { error });
 
     if (error) {
       alert("Erro ao aceitar consulta: " + error.message);

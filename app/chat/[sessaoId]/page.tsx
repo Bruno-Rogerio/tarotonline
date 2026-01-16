@@ -150,7 +150,6 @@ export default function ChatPage() {
     if (sessao?.status === "em_andamento") iniciarTimer();
   }, [sessao]);
 
-  // Scroll automático quando mensagens mudam
   useEffect(() => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop =
@@ -185,6 +184,13 @@ export default function ChatPage() {
       .eq("id", sessaoId)
       .single();
 
+    console.log("🔍 Verificando acesso à sessão:", {
+      sessaoData,
+      userId: user.id,
+      isUsuario: sessaoData?.usuario_id === user.id,
+      isAdmin: sessaoData?.admin_id === user.id,
+    });
+
     if (
       !sessaoData ||
       (sessaoData.usuario_id !== user.id && sessaoData.admin_id !== user.id)
@@ -205,7 +211,6 @@ export default function ChatPage() {
     await carregarMensagens();
     await carregarCartas();
 
-    // REALTIME - Mensagens
     const canalMensagens = supabase
       .channel(`msg-${sessaoId}-${Date.now()}`)
       .on(
@@ -217,12 +222,15 @@ export default function ChatPage() {
           filter: `sessao_id=eq.${sessaoId}`,
         },
         (payload) => {
+          console.log("🗑️ DELETE recebido:", payload);
           setMensagens((prev) => [...prev, payload.new as Mensagem]);
         }
       )
       .subscribe();
 
-    // REALTIME - Cartas
+    // REALTIME - Cartas (com debug completo)
+    console.log("🔧 Criando canal de cartas para sessão:", sessaoId);
+
     const canalCartas = supabase
       .channel(`cartas-${sessaoId}-${Date.now()}`)
       .on(
@@ -234,6 +242,7 @@ export default function ChatPage() {
           filter: `sessao_id=eq.${sessaoId}`,
         },
         (payload) => {
+          console.log("✅ INSERT recebido:", payload);
           setCartas((prev) => [...prev, payload.new as CartaMesa]);
         }
       )
@@ -246,14 +255,23 @@ export default function ChatPage() {
           filter: `sessao_id=eq.${sessaoId}`,
         },
         (payload) => {
+          console.log("🗑️ DELETE recebido:", payload);
           setCartas((prev) =>
             prev.filter((c) => c.id !== (payload.old as any).id)
           );
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log("📡 Status do canal cartas:", status, err);
+        if (status === "SUBSCRIBED") {
+          console.log("✅ Canal de cartas CONECTADO!");
+        } else if (status === "CHANNEL_ERROR") {
+          console.error("❌ Erro no canal de cartas:", err);
+        }
+      });
 
-    // REALTIME - Sessão
+    console.log("🔧 Canal criado:", canalCartas);
+
     const canalSessao = supabase
       .channel(`sess-${sessaoId}-${Date.now()}`)
       .on(
@@ -265,9 +283,11 @@ export default function ChatPage() {
           filter: `id=eq.${sessaoId}`,
         },
         (payload) => {
+          console.log("🔄 UPDATE sessão recebido:", payload);
           const nova = payload.new as any;
           setSessao((prev) => (prev ? { ...prev, ...nova } : null));
           if (nova.status === "finalizada") {
+            console.log("⏰ Sessão finalizada detectada!");
             setChatAtivo(false);
             if (timerRef.current) clearInterval(timerRef.current);
             alert("⏰ Tempo esgotado!");
@@ -275,8 +295,14 @@ export default function ChatPage() {
           }
         }
       )
-      .subscribe();
-
+      .subscribe((status, err) => {
+        console.log("📡 Status do canal sessão:", status, err);
+        if (status === "SUBSCRIBED") {
+          console.log("✅ Canal de sessão CONECTADO!");
+        } else if (status === "CHANNEL_ERROR") {
+          console.error("❌ Erro no canal de sessão:", err);
+        }
+      });
     setLoading(false);
 
     return () => {
@@ -321,12 +347,18 @@ export default function ChatPage() {
   }
 
   async function finalizarSessao() {
+    console.log("🛑 Finalizando sessão...", sessaoId);
     if (timerRef.current) clearInterval(timerRef.current);
     setChatAtivo(false);
-    await supabase
+
+    const { error, data } = await supabase
       .from("sessoes")
       .update({ status: "finalizada", fim: new Date().toISOString() })
-      .eq("id", sessaoId);
+      .eq("id", sessaoId)
+      .select(); // TUDO NA MESMA CADEIA
+
+    console.log("🛑 Update executado:", { error, data });
+
     if (sessao) {
       const { data: u } = await supabase
         .from("usuarios")
@@ -374,7 +406,24 @@ export default function ChatPage() {
 
   async function limparCartas() {
     if (!isAdmin || !confirm("Limpar todas as cartas?")) return;
-    await supabase.from("cartas_mesa").delete().eq("sessao_id", sessaoId);
+
+    console.log("🧹 Limpando cartas uma por uma...");
+
+    // Deleta cada carta individualmente para disparar evento DELETE
+    for (const carta of cartas) {
+      const { error } = await supabase
+        .from("cartas_mesa")
+        .delete()
+        .eq("id", carta.id);
+
+      if (error) {
+        console.error("Erro ao deletar carta:", error);
+      } else {
+        console.log("🗑️ Carta deletada:", carta.id);
+      }
+    }
+
+    console.log("✅ Todas as cartas foram deletadas!");
   }
 
   async function darBonus() {
@@ -420,109 +469,318 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-800 flex flex-col overflow-hidden">
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: "flex",
+        flexDirection: "column",
+        background:
+          "linear-gradient(to bottom right, rgb(88, 28, 135), rgb(49, 46, 129), rgb(88, 28, 135))",
+      }}
+    >
       {/* Header */}
-      <div className="bg-black/20 backdrop-blur-sm border-b border-white/10 p-4 shrink-0">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+      <div
+        style={{
+          flexShrink: 0,
+          padding: "1rem",
+          backgroundColor: "rgba(0,0,0,0.2)",
+          backdropFilter: "blur(4px)",
+          borderBottom: "1px solid rgba(255,255,255,0.1)",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: "1280px",
+            margin: "0 auto",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <div>
-            <h1 className="text-xl font-bold text-white">
+            <h1
+              style={{
+                fontSize: "1.25rem",
+                fontWeight: "bold",
+                color: "white",
+              }}
+            >
               🔮 Consulta com{" "}
               {isAdmin ? sessao?.usuario.nome : sessao?.tarologo.nome}
             </h1>
-            <p className="text-purple-200 text-sm">
+            <p style={{ fontSize: "0.875rem", color: "rgb(216, 180, 254)" }}>
               {isAdmin ? "Você está atendendo" : "Seu tarólogo"}
             </p>
           </div>
-          <div className="flex gap-4 items-center">
+          <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
             <div
-              className={`px-6 py-3 rounded-full font-bold text-2xl text-white ${
-                tempoRestante <= 5
-                  ? "bg-red-600 animate-pulse"
-                  : tempoRestante <= 10
-                  ? "bg-yellow-600"
-                  : "bg-green-600"
-              }`}
+              style={{
+                padding: "0.75rem 1.5rem",
+                borderRadius: "9999px",
+                fontWeight: "bold",
+                fontSize: "1.5rem",
+                color: "white",
+                backgroundColor:
+                  tempoRestante <= 5
+                    ? "rgb(220, 38, 38)"
+                    : tempoRestante <= 10
+                    ? "rgb(202, 138, 4)"
+                    : "rgb(22, 163, 74)",
+                animation:
+                  tempoRestante <= 5
+                    ? "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite"
+                    : "none",
+              }}
             >
               ⏱️ {formatarTempo(tempoRestante)}
             </div>
             {isAdmin && !sessao?.bonus_usado && chatAtivo && (
               <button
                 onClick={darBonus}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                style={{
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "rgb(147, 51, 234)",
+                  color: "white",
+                  borderRadius: "0.5rem",
+                  border: "none",
+                  cursor: "pointer",
+                }}
               >
                 🎁 Dar +5min
+              </button>
+            )}
+            {!isAdmin && chatAtivo && (
+              <button
+                onClick={async () => {
+                  if (
+                    confirm(
+                      "⚠️ Tem certeza que deseja encerrar a consulta? Você perderá os minutos restantes."
+                    )
+                  ) {
+                    await finalizarSessao();
+                  }
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "rgb(220, 38, 38)",
+                  color: "white",
+                  borderRadius: "0.5rem",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "0.875rem",
+                }}
+              >
+                ❌ Encerrar
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Conteúdo - LAYOUT 50/50 CENTRALIZADO */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full max-w-7xl mx-auto p-4 flex gap-4">
-          {/* Mesa - 50% */}
-          <div className="flex-1 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-white/20 flex justify-between items-center shrink-0">
-              <h2 className="text-white font-bold text-lg">🎴 Mesa de Tarot</h2>
+      {/* Conteúdo */}
+      <div style={{ flex: 1, minHeight: 0, padding: "1rem" }}>
+        <div
+          style={{
+            height: "100%",
+            maxWidth: "1280px",
+            margin: "0 auto",
+            display: "flex",
+            gap: "1rem",
+          }}
+        >
+          {/* Mesa */}
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              backgroundColor: "rgba(255,255,255,0.1)",
+              backdropFilter: "blur(4px)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(255,255,255,0.2)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              style={{
+                padding: "0.75rem",
+                borderBottom: "1px solid rgba(255,255,255,0.2)",
+                flexShrink: 0,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h2
+                style={{
+                  color: "white",
+                  fontWeight: "bold",
+                  fontSize: "1.125rem",
+                }}
+              >
+                🎴 Mesa de Tarot
+              </h2>
               {isAdmin && cartas.length > 0 && chatAtivo && (
                 <button
                   onClick={limparCartas}
-                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                  style={{
+                    padding: "0.25rem 0.75rem",
+                    backgroundColor: "rgb(220, 38, 38)",
+                    color: "white",
+                    borderRadius: "0.25rem",
+                    fontSize: "0.875rem",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
                 >
                   Limpar
                 </button>
               )}
             </div>
 
-            {/* Cartas com scroll - GRID FIXO 3 COLUNAS */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-3 gap-3 auto-rows-min">
+            {/* Cartas - FLEX WRAP */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                padding: "0.75rem",
+              }}
+            >
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
                 {cartas.map((carta) => (
                   <div
                     key={carta.id}
-                    className="w-full"
-                    style={{ aspectRatio: "2/3", maxHeight: "280px" }}
+                    style={{ width: "calc(33.333% - 0.35rem)" }}
                   >
-                    <div className="w-full h-full bg-gradient-to-br from-yellow-600 to-yellow-800 rounded-xl border-4 border-yellow-900 shadow-2xl p-2 flex flex-col relative">
-                      {/* Inicial */}
-                      <div className="flex-1 flex items-center justify-center">
-                        <div className="text-white text-5xl font-bold drop-shadow-2xl">
+                    <div
+                      style={{
+                        background:
+                          "linear-gradient(to bottom right, rgb(202, 138, 4), rgb(161, 98, 7))",
+                        borderRadius: "0.5rem",
+                        border: "2px solid rgb(113, 63, 18)",
+                        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                        padding: "0.5rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        position: "relative",
+                        aspectRatio: "2/3",
+                        maxHeight: "180px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "0.25rem",
+                          left: "0.25rem",
+                          backgroundColor: "rgba(0,0,0,0.8)",
+                          padding: "0.125rem 0.375rem",
+                          borderRadius: "0.25rem",
+                          color: "rgb(253, 224, 71)",
+                          fontSize: "10px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        #{carta.ordem}
+                      </div>
+                      <div
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            color: "white",
+                            fontSize: "2.25rem",
+                            fontWeight: "bold",
+                            filter:
+                              "drop-shadow(0 25px 25px rgb(0 0 0 / 0.15))",
+                          }}
+                        >
                           {getInicialCarta(carta.nome_carta)}
                         </div>
                       </div>
-                      {/* Nome */}
-                      <div className="bg-black/80 p-1.5 rounded mt-1">
-                        <p className="text-white font-bold text-center text-[11px] leading-tight">
+                      <div
+                        style={{
+                          backgroundColor: "rgba(0,0,0,0.8)",
+                          padding: "0.25rem",
+                          borderRadius: "0.25rem",
+                        }}
+                      >
+                        <p
+                          style={{
+                            color: "white",
+                            fontWeight: "bold",
+                            textAlign: "center",
+                            fontSize: "10px",
+                            lineHeight: "1.25",
+                          }}
+                        >
                           {carta.nome_carta}
                         </p>
-                      </div>
-                      {/* Número */}
-                      <div className="absolute top-2 left-2 bg-black/80 px-1.5 py-0.5 rounded text-yellow-300 text-[9px] font-bold">
-                        #{carta.ordem}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
               {cartas.length === 0 && (
-                <div className="h-full flex items-center justify-center text-white/40 text-sm">
+                <div
+                  style={{
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "rgba(255,255,255,0.4)",
+                    fontSize: "0.875rem",
+                  }}
+                >
                   Nenhuma carta na mesa
                 </div>
               )}
             </div>
 
-            {/* Adicionar carta */}
+            {/* Footer */}
             {isAdmin && cartas.length < 10 && chatAtivo && (
-              <div className="p-4 border-t border-white/20 shrink-0">
+              <div
+                style={{
+                  padding: "0.75rem",
+                  borderTop: "1px solid rgba(255,255,255,0.2)",
+                  flexShrink: 0,
+                }}
+              >
                 <input
                   type="text"
                   value={buscarCarta}
                   onChange={(e) => setBuscarCarta(e.target.value)}
                   placeholder="Buscar carta..."
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 mb-2 text-sm"
+                  style={{
+                    width: "100%",
+                    padding: "0.5rem 0.75rem",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    borderRadius: "0.5rem",
+                    color: "white",
+                    fontSize: "0.875rem",
+                    marginBottom: "0.5rem",
+                  }}
                 />
                 {buscarCarta && cartasFiltradas.length > 0 && (
-                  <div className="max-h-32 overflow-y-auto bg-slate-900/90 rounded-lg mb-2">
+                  <div
+                    style={{
+                      maxHeight: "8rem",
+                      overflowY: "auto",
+                      backgroundColor: "rgba(15, 23, 42, 0.9)",
+                      borderRadius: "0.5rem",
+                      marginBottom: "0.5rem",
+                    }}
+                  >
                     {cartasFiltradas.slice(0, 6).map((c, i) => (
                       <button
                         key={i}
@@ -530,7 +788,17 @@ export default function ChatPage() {
                           setNovaCarta(c);
                           setBuscarCarta("");
                         }}
-                        className="w-full text-left px-3 py-2 text-white hover:bg-white/10 text-sm border-b border-white/5 last:border-b-0"
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "0.5rem 0.75rem",
+                          color: "white",
+                          fontSize: "0.875rem",
+                          borderBottom: "1px solid rgba(255,255,255,0.05)",
+                          backgroundColor: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
                       >
                         {c}
                       </button>
@@ -538,14 +806,34 @@ export default function ChatPage() {
                   </div>
                 )}
                 {novaCarta && (
-                  <div className="mb-2 p-2 bg-white/10 rounded text-white text-sm">
+                  <div
+                    style={{
+                      marginBottom: "0.5rem",
+                      padding: "0.5rem",
+                      backgroundColor: "rgba(255,255,255,0.1)",
+                      borderRadius: "0.25rem",
+                      color: "white",
+                      fontSize: "0.875rem",
+                    }}
+                  >
                     {novaCarta}
                   </div>
                 )}
                 <button
                   onClick={adicionarCarta}
                   disabled={!novaCarta}
-                  className="w-full py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded-lg text-sm"
+                  style={{
+                    width: "100%",
+                    padding: "0.5rem",
+                    backgroundColor: novaCarta
+                      ? "rgb(147, 51, 234)"
+                      : "rgb(75, 85, 99)",
+                    color: "white",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.875rem",
+                    border: "none",
+                    cursor: novaCarta ? "pointer" : "not-allowed",
+                  }}
                 >
                   + Adicionar Carta
                 </button>
@@ -553,37 +841,83 @@ export default function ChatPage() {
             )}
           </div>
 
-          {/* Chat - 50% */}
-          <div className="flex-1 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 flex flex-col overflow-hidden">
-            {/* Mensagens */}
+          {/* Chat */}
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              backgroundColor: "rgba(255,255,255,0.1)",
+              backdropFilter: "blur(4px)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(255,255,255,0.2)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             <div
               ref={messagesContainerRef}
-              className="flex-1 overflow-y-auto p-4"
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                padding: "0.75rem",
+              }}
             >
-              <div className="space-y-3">
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.5rem",
+                }}
+              >
                 {mensagens.map((msg) => {
                   const isMinha = msg.remetente_id === usuarioId;
                   return (
                     <div
                       key={msg.id}
-                      className={`flex ${
-                        isMinha ? "justify-end" : "justify-start"
-                      }`}
+                      style={{
+                        display: "flex",
+                        justifyContent: isMinha ? "flex-end" : "flex-start",
+                      }}
                     >
                       <div
-                        className={`max-w-sm px-4 py-2 rounded-lg ${
-                          isMinha
-                            ? "bg-purple-600 text-white"
-                            : "bg-white/20 text-white"
-                        }`}
+                        style={{
+                          maxWidth: "70%",
+                          padding: "0.5rem 0.75rem",
+                          borderRadius: "0.5rem",
+                          backgroundColor: isMinha
+                            ? "rgb(147, 51, 234)"
+                            : "rgba(255,255,255,0.2)",
+                          color: "white",
+                        }}
                       >
                         {!isMinha && (
-                          <p className="text-xs font-semibold mb-1 text-purple-300">
+                          <p
+                            style={{
+                              fontSize: "0.75rem",
+                              fontWeight: "600",
+                              marginBottom: "0.25rem",
+                              color: "rgb(216, 180, 254)",
+                            }}
+                          >
                             {getNome(msg.remetente_id)}
                           </p>
                         )}
-                        <p className="break-words">{msg.mensagem}</p>
-                        <p className="text-xs opacity-60 mt-1">
+                        <p
+                          style={{
+                            wordBreak: "break-word",
+                            fontSize: "0.875rem",
+                          }}
+                        >
+                          {msg.mensagem}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: "0.75rem",
+                            opacity: 0.6,
+                            marginTop: "0.25rem",
+                          }}
+                        >
                           {new Date(msg.created_at).toLocaleTimeString(
                             "pt-BR",
                             { hour: "2-digit", minute: "2-digit" }
@@ -596,31 +930,49 @@ export default function ChatPage() {
               </div>
             </div>
 
-            {/* Input */}
             <form
               onSubmit={enviarMensagem}
-              className="p-4 border-t border-white/20 shrink-0"
+              style={{
+                padding: "0.75rem",
+                borderTop: "1px solid rgba(255,255,255,0.2)",
+                flexShrink: 0,
+              }}
             >
               {chatAtivo ? (
-                <div className="flex gap-2">
+                <div style={{ display: "flex", gap: "0.5rem" }}>
                   <input
                     type="text"
                     value={novaMensagem}
                     onChange={(e) => setNovaMensagem(e.target.value)}
                     placeholder="Digite sua mensagem..."
                     autoFocus
-                    className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    style={{
+                      flex: 1,
+                      padding: "0.5rem 1rem",
+                      backgroundColor: "rgba(255,255,255,0.1)",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      borderRadius: "0.5rem",
+                      color: "white",
+                    }}
                   />
                   <button
                     type="submit"
-                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium"
+                    style={{
+                      padding: "0.5rem 1.5rem",
+                      backgroundColor: "rgb(147, 51, 234)",
+                      color: "white",
+                      borderRadius: "0.5rem",
+                      fontWeight: "500",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
                   >
                     Enviar
                   </button>
                 </div>
               ) : (
-                <div className="text-center py-4">
-                  <p className="text-red-300 font-medium">
+                <div style={{ textAlign: "center", padding: "0.5rem" }}>
+                  <p style={{ color: "rgb(252, 165, 165)", fontWeight: "500" }}>
                     ⏰ Consulta finalizada
                   </p>
                 </div>

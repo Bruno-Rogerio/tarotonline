@@ -26,10 +26,14 @@ export default function TarologoCard({
   tarologo,
   usuarioLogado = false,
   temMinutos = false,
+  isAdmin = false,
+  onChangeStatus,
 }: {
   tarologo: Tarologo;
   usuarioLogado?: boolean;
   temMinutos?: boolean;
+  isAdmin?: boolean;
+  onChangeStatus?: (status: "disponivel" | "ocupado" | "indisponivel") => void;
 }) {
   const [flipped, setFlipped] = useState(false);
   const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
@@ -140,6 +144,33 @@ export default function TarologoCard({
               </div>
 
               <div className="mt-auto w-full space-y-2">
+                {/* Botões de controle de status (só admin) */}
+                {isAdmin && (
+                  <div className="flex gap-1 mb-2">
+                    <button
+                      onClick={() => onChangeStatus?.("disponivel")}
+                      className="flex-1 py-1 text-xs rounded bg-green-600 hover:bg-green-700 text-white"
+                      title="Disponível"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      onClick={() => onChangeStatus?.("ocupado")}
+                      className="flex-1 py-1 text-xs rounded bg-yellow-600 hover:bg-yellow-700 text-white"
+                      title="Ocupado"
+                    >
+                      ⏱
+                    </button>
+                    <button
+                      onClick={() => onChangeStatus?.("indisponivel")}
+                      className="flex-1 py-1 text-xs rounded bg-red-600 hover:bg-red-700 text-white"
+                      title="Indisponível"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
                 {/* Botão Ver Avaliações */}
                 <button
                   onClick={() => setFlipped(true)}
