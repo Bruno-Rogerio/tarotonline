@@ -47,28 +47,28 @@ export default function TimerMistico({
   // Configurar cores baseado no estado
   const cores = {
     verde: {
-      anel: "#10b981",
+      anel: "stroke-emerald-400",
       fundo: "from-emerald-500/30 to-green-600/30",
-      texto: "#34d399",
-      brilho: "0 0 20px rgba(16, 185, 129, 0.5)",
+      texto: "text-emerald-300",
+      brilho: "shadow-emerald-500/50",
     },
     amarelo: {
-      anel: "#fbbf24",
+      anel: "stroke-yellow-400",
       fundo: "from-yellow-500/30 to-amber-600/30",
-      texto: "#fbbf24",
-      brilho: "0 0 20px rgba(251, 191, 36, 0.5)",
+      texto: "text-yellow-300",
+      brilho: "shadow-yellow-500/50",
     },
     laranja: {
-      anel: "#f97316",
+      anel: "stroke-orange-500",
       fundo: "from-orange-500/30 to-red-600/30",
-      texto: "#fb923c",
-      brilho: "0 0 20px rgba(249, 115, 22, 0.5)",
+      texto: "text-orange-300",
+      brilho: "shadow-orange-500/50",
     },
     vermelho: {
-      anel: "#ef4444",
+      anel: "stroke-red-500",
       fundo: "from-red-500/30 to-rose-600/30",
-      texto: "#f87171",
-      brilho: "0 0 20px rgba(239, 68, 68, 0.5)",
+      texto: "text-red-300",
+      brilho: "shadow-red-500/50",
     },
   };
 
@@ -90,58 +90,37 @@ export default function TimerMistico({
     }
   }, [minutosRestantes, onTempoEsgotado]);
 
-  // Calcular valores para o círculo SVG
-  const tamanho = 120;
-  const raio = 50;
+  // REDUZIDO: 120px → 80px
+  const tamanho = 80;
+  const raio = 32;
   const circunferencia = 2 * Math.PI * raio;
   const progresso = Math.min(percentualUsado, 100);
   const offset = circunferencia - (progresso / 100) * circunferencia;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "8px",
-      }}
-    >
-      {/* Timer Circular */}
-      <div style={{ position: "relative" }}>
+    <div className="flex flex-col items-center gap-1">
+      {/* Timer Circular - 80px */}
+      <div className="relative">
         {/* Brilho de fundo */}
         <div
-          className={pulsando ? "animate-pulse" : ""}
-          style={{
-            position: "absolute",
-            inset: 0,
-            borderRadius: "9999px",
-            filter: "blur(16px)",
-            boxShadow: estilo.brilho,
-            opacity: 0.4,
-          }}
+          className={`absolute inset-0 rounded-full blur-lg ${estilo.brilho} ${
+            pulsando ? "animate-pulse" : ""
+          }`}
+          style={{ opacity: 0.3 }}
         />
 
         {/* Container do círculo */}
         <div
-          className={`bg-gradient-to-br ${estilo.fundo} ${
+          className={`relative rounded-full bg-gradient-to-br ${
+            estilo.fundo
+          } border-2 border-white/20 ${
             pulsando ? "animate-pulse" : ""
-          }`}
-          style={{
-            position: "relative",
-            width: `${tamanho}px`,
-            height: `${tamanho}px`,
-            borderRadius: "9999px",
-            border: "2px solid rgba(255, 255, 255, 0.2)",
-            boxShadow: "0 10px 40px rgba(0, 0, 0, 0.3)",
-          }}
+          } shadow-lg`}
+          style={{ width: `${tamanho}px`, height: `${tamanho}px` }}
         >
           {/* SVG do progresso */}
           <svg
-            style={{
-              position: "absolute",
-              inset: 0,
-              transform: "rotate(-90deg)",
-            }}
+            className="absolute inset-0 -rotate-90"
             width={tamanho}
             height={tamanho}
           >
@@ -152,7 +131,7 @@ export default function TimerMistico({
               r={raio}
               fill="none"
               stroke="rgba(255, 255, 255, 0.15)"
-              strokeWidth="6"
+              strokeWidth="5"
             />
 
             {/* Círculo de progresso */}
@@ -161,19 +140,19 @@ export default function TimerMistico({
               cy={tamanho / 2}
               r={raio}
               fill="none"
-              stroke={estilo.anel}
-              strokeWidth="7"
+              className={estilo.anel}
+              strokeWidth="5"
               strokeLinecap="round"
               strokeDasharray={circunferencia}
               strokeDashoffset={offset}
               style={{
                 transition: "stroke-dashoffset 1s ease-in-out",
-                filter: `drop-shadow(0 0 8px ${estilo.anel})`,
+                filter: "drop-shadow(0 0 4px currentColor)",
               }}
             />
           </svg>
 
-          {/* Conteúdo central - LAYOUT MELHORADO */}
+          {/* Conteúdo central - COMPACTO */}
           <div
             style={{
               position: "absolute",
@@ -182,84 +161,55 @@ export default function TimerMistico({
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              padding: "16px",
+              padding: "8px",
             }}
           >
-            {/* Tempo decorrido - DESTAQUE */}
+            {/* Tempo decorrido */}
             <div
+              className={`font-bold ${estilo.texto}`}
               style={{
-                fontSize: "28px",
-                fontWeight: "bold",
+                fontSize: "16px",
                 lineHeight: "1",
-                color: estilo.texto,
-                textShadow: `0 0 10px ${estilo.anel}`,
-                marginBottom: "4px",
+                marginBottom: "2px",
+                textShadow: "0 2px 8px rgba(0,0,0,0.5)",
               }}
             >
               {tempoFormatado}
             </div>
 
-            {/* Tempo restante - BEM ESPAÇADO */}
+            {/* Tempo restante */}
             <div
+              className="text-white/70"
               style={{
-                fontSize: "11px",
-                fontWeight: "500",
-                color: "rgba(255, 255, 255, 0.95)",
-                marginTop: "2px",
+                fontSize: "8px",
+                marginTop: "1px",
                 whiteSpace: "nowrap",
               }}
             >
-              {Math.floor(minutosRestantes)}min restantes
+              {Math.floor(minutosRestantes)}min
             </div>
 
-            {/* Percentual - SEPARADO */}
+            {/* Percentual */}
             <div
+              className={`${estilo.texto}`}
               style={{
-                fontSize: "10px",
-                fontWeight: "600",
-                color: estilo.texto,
-                marginTop: "2px",
+                fontSize: "7px",
+                marginTop: "1px",
               }}
             >
-              {progresso.toFixed(0)}% usado
+              {progresso.toFixed(0)}%
             </div>
           </div>
         </div>
       </div>
 
-      {/* Avisos */}
+      {/* Avisos compactos */}
       {cor === "vermelho" && (
         <div
-          className="animate-pulse"
-          style={{
-            borderRadius: "4px",
-            padding: "6px 12px",
-            fontSize: "11px",
-            fontWeight: "bold",
-            backgroundColor: "rgba(220, 38, 38, 0.3)",
-            border: "1px solid rgba(239, 68, 68, 0.6)",
-            color: "#fca5a5",
-            whiteSpace: "nowrap",
-          }}
+          className="bg-red-900/50 border border-red-500/60 rounded px-1.5 py-0.5 text-red-200 font-medium animate-pulse"
+          style={{ fontSize: "8px" }}
         >
-          ⚠️ Tempo quase esgotado!
-        </div>
-      )}
-
-      {cor === "laranja" && (
-        <div
-          style={{
-            borderRadius: "4px",
-            padding: "6px 12px",
-            fontSize: "11px",
-            fontWeight: "600",
-            backgroundColor: "rgba(249, 115, 22, 0.3)",
-            border: "1px solid rgba(249, 115, 22, 0.6)",
-            color: "#fdba74",
-            whiteSpace: "nowrap",
-          }}
-        >
-          ⏰ Poucos minutos
+          ⏰ Urgente!
         </div>
       )}
     </div>

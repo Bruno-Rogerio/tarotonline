@@ -111,10 +111,12 @@ export default function ChatPage() {
   useEffect(() => {
     if (messagesContainerRef.current) {
       const container = messagesContainerRef.current;
-      // Forçar scroll pro FINAL
-      setTimeout(() => {
-        container.scrollTop = container.scrollHeight;
-      }, 100);
+      // Double requestAnimationFrame garante render completo
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight;
+        });
+      });
     }
   }, [mensagens]);
 
@@ -431,7 +433,7 @@ export default function ChatPage() {
     <div
       style={{
         flex: mobile ? "none" : 1,
-        height: mobile ? "220px" : "auto", // AUMENTADO: 200px → 220px
+        height: mobile ? "240px" : "auto", // AUMENTADO: 200px → 220px
         minWidth: 0,
         backgroundColor: "rgba(255,255,255,0.1)",
         backdropFilter: "blur(4px)",
@@ -918,7 +920,7 @@ export default function ChatPage() {
           <div
             style={{
               display: "flex",
-              gap: isMobile ? "0.5rem" : "1rem",
+              gap: isMobile ? "0.4rem" : "1rem",
               alignItems: "center",
               flexWrap: "wrap",
               flexDirection: isMobile ? "row-reverse" : "row",
