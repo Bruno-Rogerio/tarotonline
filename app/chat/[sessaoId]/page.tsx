@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import TimerMistico from "@/components/Timermistico";
+import { getImagemCarta } from "@/lib/getImagemCarta"; // ADICIONADO
 
 type Mensagem = {
   id: string;
@@ -55,62 +56,6 @@ const CARTAS_TAROT = [
   "O Sol",
   "O Julgamento",
   "O Mundo",
-  "Ás de Copas",
-  "Dois de Copas",
-  "Três de Copas",
-  "Quatro de Copas",
-  "Cinco de Copas",
-  "Seis de Copas",
-  "Sete de Copas",
-  "Oito de Copas",
-  "Nove de Copas",
-  "Dez de Copas",
-  "Valete de Copas",
-  "Cavaleiro de Copas",
-  "Rainha de Copas",
-  "Rei de Copas",
-  "Ás de Paus",
-  "Dois de Paus",
-  "Três de Paus",
-  "Quatro de Paus",
-  "Cinco de Paus",
-  "Seis de Paus",
-  "Sete de Paus",
-  "Oito de Paus",
-  "Nove de Paus",
-  "Dez de Paus",
-  "Valete de Paus",
-  "Cavaleiro de Paus",
-  "Rainha de Paus",
-  "Rei de Paus",
-  "Ás de Espadas",
-  "Dois de Espadas",
-  "Três de Espadas",
-  "Quatro de Espadas",
-  "Cinco de Espadas",
-  "Seis de Espadas",
-  "Sete de Espadas",
-  "Oito de Espadas",
-  "Nove de Espadas",
-  "Dez de Espadas",
-  "Valete de Espadas",
-  "Cavaleiro de Espadas",
-  "Rainha de Espadas",
-  "Rei de Espadas",
-  "Ás de Ouros",
-  "Dois de Ouros",
-  "Três de Ouros",
-  "Quatro de Ouros",
-  "Cinco de Ouros",
-  "Seis de Ouros",
-  "Sete de Ouros",
-  "Oito de Ouros",
-  "Nove de Ouros",
-  "Dez de Ouros",
-  "Valete de Ouros",
-  "Cavaleiro de Ouros",
-  "Rainha de Ouros",
-  "Rei de Ouros",
 ];
 
 export default function ChatPage() {
@@ -127,7 +72,7 @@ export default function ChatPage() {
   const [novaMensagem, setNovaMensagem] = useState("");
   const [novaCarta, setNovaCarta] = useState("");
   const [buscarCarta, setBuscarCarta] = useState("");
-  const [tempoDecorrido, setTempoDecorrido] = useState(0); // MUDANÇA: agora é progressivo em SEGUNDOS
+  const [tempoDecorrido, setTempoDecorrido] = useState(0);
   const [chatAtivo, setChatAtivo] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -229,7 +174,6 @@ export default function ChatPage() {
       )
       .subscribe();
 
-    // REALTIME - Cartas (com debug completo)
     console.log("🔧 Criando canal de cartas para sessão:", sessaoId);
 
     const canalCartas = supabase
@@ -313,16 +257,14 @@ export default function ChatPage() {
     };
   }
 
-  // MUDANÇA: Timer agora é progressivo (crescente)
   function iniciarTimer() {
     if (!sessao) return;
     const inicio = new Date(sessao.inicio).getTime();
 
     const atualizar = () => {
-      const decorrido = Math.floor((Date.now() - inicio) / 1000); // SEGUNDOS
+      const decorrido = Math.floor((Date.now() - inicio) / 1000);
       setTempoDecorrido(decorrido);
 
-      // Verificar se esgotou saldo (converter minutos para segundos)
       const saldoSegundos = sessao.minutos_comprados * 60;
       if (decorrido >= saldoSegundos) {
         finalizarSessao();
@@ -351,7 +293,6 @@ export default function ChatPage() {
     if (data) setCartas(data);
   }
 
-  // MUDANÇA: Finalizar agora deduz apenas o tempo usado (arredondado pra cima)
   async function finalizarSessao() {
     console.log("🛑 Finalizando sessão...", sessaoId);
     if (timerRef.current) clearInterval(timerRef.current);
@@ -359,7 +300,6 @@ export default function ChatPage() {
 
     if (!sessao) return;
 
-    // Calcular tempo usado em minutos - ARREDONDAR PRA CIMA
     const minutosUsados = Math.ceil(tempoDecorrido / 60);
 
     const { error, data } = await supabase
@@ -367,14 +307,13 @@ export default function ChatPage() {
       .update({
         status: "finalizada",
         fim: new Date().toISOString(),
-        minutos_usados: minutosUsados, // Salvar tempo usado
+        minutos_usados: minutosUsados,
       })
       .eq("id", sessaoId)
       .select();
 
     console.log("🛑 Update executado:", { error, data });
 
-    // Deduzir APENAS o tempo usado do saldo do usuário
     const { data: u } = await supabase
       .from("usuarios")
       .select("minutos_disponiveis")
@@ -422,7 +361,6 @@ export default function ChatPage() {
 
     console.log("🧹 Limpando cartas uma por uma...");
 
-    // Deleta cada carta individualmente para disparar evento DELETE
     for (const carta of cartas) {
       const { error } = await supabase
         .from("cartas_mesa")
@@ -439,12 +377,10 @@ export default function ChatPage() {
     console.log("✅ Todas as cartas foram deletadas!");
   }
 
-  // MUDANÇA: Bônus agora adiciona ao saldo do usuário também
   async function darBonus() {
     if (!isAdmin || !sessao || sessao.bonus_usado || !confirm("Dar +5min?"))
       return;
 
-    // Adicionar 5 minutos ao SALDO do usuário
     const { data: usuario } = await supabase
       .from("usuarios")
       .select("minutos_disponiveis")
@@ -462,7 +398,7 @@ export default function ChatPage() {
       await supabase
         .from("sessoes")
         .update({
-          minutos_comprados: sessao.minutos_comprados + 5, // Atualiza saldo da sessão
+          minutos_comprados: sessao.minutos_comprados + 5,
           bonus_usado: true,
         })
         .eq("id", sessaoId);
@@ -543,7 +479,6 @@ export default function ChatPage() {
             </p>
           </div>
           <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-            {/* MUDANÇA: Timer Místico Progressivo */}
             {sessao && (
               <TimerMistico
                 tempoDecorrido={tempoDecorrido}
@@ -552,7 +487,6 @@ export default function ChatPage() {
               />
             )}
 
-            {/* Botão Bônus */}
             {isAdmin && !sessao?.bonus_usado && chatAtivo && (
               <button
                 onClick={darBonus}
@@ -569,7 +503,6 @@ export default function ChatPage() {
               </button>
             )}
 
-            {/* MUDANÇA: Botão Finalizar para Admin */}
             {isAdmin && chatAtivo && (
               <button
                 onClick={async () => {
@@ -591,7 +524,6 @@ export default function ChatPage() {
               </button>
             )}
 
-            {/* Botão Encerrar (Cliente) */}
             {!isAdmin && chatAtivo && (
               <button
                 onClick={async () => {
@@ -681,7 +613,7 @@ export default function ChatPage() {
               )}
             </div>
 
-            {/* Cartas - FLEX WRAP */}
+            {/* ============ CARTAS COM IMAGENS - INÍCIO ============ */}
             <div
               style={{
                 flex: 1,
@@ -691,83 +623,118 @@ export default function ChatPage() {
               }}
             >
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                {cartas.map((carta) => (
-                  <div
-                    key={carta.id}
-                    style={{ width: "calc(33.333% - 0.35rem)" }}
-                  >
+                {cartas.map((carta) => {
+                  // BUSCAR URL DA IMAGEM
+                  const imagemUrl = getImagemCarta(carta.nome_carta);
+
+                  return (
                     <div
-                      style={{
-                        background:
-                          "linear-gradient(to bottom right, rgb(202, 138, 4), rgb(161, 98, 7))",
-                        borderRadius: "0.5rem",
-                        border: "2px solid rgb(113, 63, 18)",
-                        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                        padding: "0.5rem",
-                        display: "flex",
-                        flexDirection: "column",
-                        position: "relative",
-                        aspectRatio: "2/3",
-                        maxHeight: "180px",
-                      }}
+                      key={carta.id}
+                      style={{ width: "calc(33.333% - 0.35rem)" }}
                     >
                       <div
                         style={{
-                          position: "absolute",
-                          top: "0.25rem",
-                          left: "0.25rem",
-                          backgroundColor: "rgba(0,0,0,0.8)",
-                          padding: "0.125rem 0.375rem",
-                          borderRadius: "0.25rem",
-                          color: "rgb(253, 224, 71)",
-                          fontSize: "10px",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        #{carta.ordem}
-                      </div>
-                      <div
-                        style={{
-                          flex: 1,
+                          background:
+                            "linear-gradient(to bottom right, rgb(202, 138, 4), rgb(161, 98, 7))",
+                          borderRadius: "0.5rem",
+                          border: "2px solid rgb(113, 63, 18)",
+                          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                          padding: "0.5rem",
                           display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
+                          flexDirection: "column",
+                          position: "relative",
+                          aspectRatio: "2/3",
+                          maxHeight: "180px",
+                          overflow: "hidden",
                         }}
                       >
+                        {/* Número da ordem */}
                         <div
                           style={{
-                            color: "white",
-                            fontSize: "2.25rem",
+                            position: "absolute",
+                            top: "0.25rem",
+                            left: "0.25rem",
+                            backgroundColor: "rgba(0,0,0,0.8)",
+                            padding: "0.125rem 0.375rem",
+                            borderRadius: "0.25rem",
+                            color: "rgb(253, 224, 71)",
+                            fontSize: "10px",
                             fontWeight: "bold",
-                            filter:
-                              "drop-shadow(0 25px 25px rgb(0 0 0 / 0.15))",
+                            zIndex: 10,
                           }}
                         >
-                          {getInicialCarta(carta.nome_carta)}
+                          #{carta.ordem}
+                        </div>
+
+                        {/* IMAGEM DA CARTA OU FALLBACK */}
+                        <div
+                          style={{
+                            flex: 1,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            overflow: "hidden",
+                            borderRadius: "0.25rem",
+                          }}
+                        >
+                          {imagemUrl ? (
+                            <img
+                              src={imagemUrl}
+                              alt={carta.nome_carta}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
+                              onError={(e) => {
+                                console.error(
+                                  `Erro ao carregar imagem: ${carta.nome_carta}`
+                                );
+                                // Esconder imagem e mostrar fallback
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                          ) : (
+                            // Fallback: letra inicial
+                            <div
+                              style={{
+                                color: "white",
+                                fontSize: "2.25rem",
+                                fontWeight: "bold",
+                                filter:
+                                  "drop-shadow(0 25px 25px rgb(0 0 0 / 0.15))",
+                              }}
+                            >
+                              {getInicialCarta(carta.nome_carta)}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Nome da carta */}
+                        <div
+                          style={{
+                            backgroundColor: "rgba(0,0,0,0.8)",
+                            padding: "0.25rem",
+                            borderRadius: "0.25rem",
+                            marginTop: "0.25rem",
+                          }}
+                        >
+                          <p
+                            style={{
+                              color: "white",
+                              fontWeight: "bold",
+                              textAlign: "center",
+                              fontSize: "10px",
+                              lineHeight: "1.25",
+                            }}
+                          >
+                            {carta.nome_carta}
+                          </p>
                         </div>
                       </div>
-                      <div
-                        style={{
-                          backgroundColor: "rgba(0,0,0,0.8)",
-                          padding: "0.25rem",
-                          borderRadius: "0.25rem",
-                        }}
-                      >
-                        <p
-                          style={{
-                            color: "white",
-                            fontWeight: "bold",
-                            textAlign: "center",
-                            fontSize: "10px",
-                            lineHeight: "1.25",
-                          }}
-                        >
-                          {carta.nome_carta}
-                        </p>
-                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               {cartas.length === 0 && (
                 <div
@@ -784,6 +751,7 @@ export default function ChatPage() {
                 </div>
               )}
             </div>
+            {/* ============ CARTAS COM IMAGENS - FIM ============ */}
 
             {/* Footer */}
             {isAdmin && cartas.length < 10 && chatAtivo && (
