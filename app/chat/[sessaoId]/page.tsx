@@ -79,6 +79,7 @@ export default function ChatPage() {
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const shouldScrollRef = useRef(true); // NOVO: controle de scroll
 
   const cartasFiltradas = buscarCarta
     ? CARTAS_TAROT.filter((c) =>
@@ -107,8 +108,9 @@ export default function ChatPage() {
     if (sessao?.status === "em_andamento") iniciarTimer();
   }, [sessao]);
 
+  // CORRIGIDO: Scroll inteligente - só scroll se shouldScrollRef for true
   useEffect(() => {
-    if (messagesContainerRef.current) {
+    if (shouldScrollRef.current && messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop =
         messagesContainerRef.current.scrollHeight;
     }
@@ -172,6 +174,7 @@ export default function ChatPage() {
           filter: `sessao_id=eq.${sessaoId}`,
         },
         (payload) => {
+          shouldScrollRef.current = true; // ATIVA scroll para nova mensagem
           setMensagens((prev) => [...prev, payload.new as Mensagem]);
         }
       )
@@ -313,6 +316,9 @@ export default function ChatPage() {
   async function enviarMensagem(e: React.FormEvent) {
     e.preventDefault();
     if (!novaMensagem.trim() || !chatAtivo) return;
+
+    shouldScrollRef.current = true; // ATIVA scroll para mensagem enviada
+
     await supabase.from("mensagens").insert({
       sessao_id: sessaoId,
       remetente_id: usuarioId,
@@ -320,6 +326,18 @@ export default function ChatPage() {
     });
     setNovaMensagem("");
   }
+
+  // NOVO: Handler para detectar scroll manual
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } =
+      messagesContainerRef.current;
+    const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 50;
+
+    // Se não está no final, desativa auto-scroll
+    shouldScrollRef.current = isAtBottom;
+  };
 
   async function adicionarCarta(e: React.FormEvent) {
     e.preventDefault();
@@ -394,12 +412,12 @@ export default function ChatPage() {
     );
   }
 
-  // ========== COMPONENTE MESA (reutilizável) ==========
+  // ========== COMPONENTE MESA ==========
   const MesaCartas = ({ mobile = false }: { mobile?: boolean }) => (
     <div
       style={{
         flex: mobile ? "none" : 1,
-        height: mobile ? "180px" : "auto",
+        height: mobile ? "200px" : "auto", // AJUSTADO: 180px → 200px
         minWidth: 0,
         backgroundColor: "rgba(255,255,255,0.1)",
         backdropFilter: "blur(4px)",
@@ -446,7 +464,6 @@ export default function ChatPage() {
         )}
       </div>
 
-      {/* Cartas - MOBILE: scroll horizontal | DESKTOP: wrap */}
       <div
         style={{
           flex: 1,
@@ -470,7 +487,7 @@ export default function ChatPage() {
               <div
                 key={carta.id}
                 style={{
-                  width: mobile ? "120px" : "calc(33.333% - 0.35rem)",
+                  width: mobile ? "130px" : "calc(33.333% - 0.35rem)", // AJUSTADO: 120px → 130px
                   flexShrink: 0,
                 }}
               >
@@ -486,12 +503,11 @@ export default function ChatPage() {
                     flexDirection: "column",
                     position: "relative",
                     aspectRatio: "2/3",
-                    height: mobile ? "180px" : "auto",
-                    maxHeight: mobile ? "180px" : "180px",
+                    height: mobile ? "195px" : "auto", // AJUSTADO: 180px → 195px
+                    maxHeight: mobile ? "195px" : "180px",
                     overflow: "hidden",
                   }}
                 >
-                  {/* Número */}
                   <div
                     style={{
                       position: "absolute",
@@ -509,7 +525,6 @@ export default function ChatPage() {
                     #{carta.ordem}
                   </div>
 
-                  {/* Imagem */}
                   <div
                     style={{
                       flex: 1,
@@ -547,7 +562,6 @@ export default function ChatPage() {
                     )}
                   </div>
 
-                  {/* Nome */}
                   <div
                     style={{
                       backgroundColor: "rgba(0,0,0,0.8)",
@@ -589,7 +603,6 @@ export default function ChatPage() {
         )}
       </div>
 
-      {/* Footer Admin - SÓ NO DESKTOP */}
       {isAdmin && cartas.length < 10 && chatAtivo && !mobile && (
         <div
           style={{
@@ -685,7 +698,7 @@ export default function ChatPage() {
     </div>
   );
 
-  // ========== COMPONENTE CHAT (reutilizável) ==========
+  // ========== COMPONENTE CHAT ==========
   const ChatMensagens = ({ mobile = false }: { mobile?: boolean }) => (
     <div
       style={{
@@ -702,6 +715,7 @@ export default function ChatPage() {
     >
       <div
         ref={messagesContainerRef}
+        onScroll={handleScroll} // NOVO: detecta scroll manual
         style={{
           flex: 1,
           minHeight: 0,
@@ -881,14 +895,88 @@ export default function ChatPage() {
               {isAdmin ? "Cliente" : "Seu tarólogo"}
             </p>
           </div>
+
+          {/* AJUSTADO: Timer à direita no mobile */}
           <div
             style={{
               display: "flex",
               gap: isMobile ? "0.5rem" : "1rem",
               alignItems: "center",
               flexWrap: "wrap",
+              flexDirection: isMobile ? "row-reverse" : "row", // INVERTIDO
             }}
           >
+            {/* Botões */}
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              {isAdmin && !sessao?.bonus_usado && chatAtivo && (
+                <button
+                  onClick={darBonus}
+                  style={{
+                    padding: isMobile ? "0.4rem 0.8rem" : "0.5rem 1rem",
+                    backgroundColor: "rgb(147, 51, 234)",
+                    color: "white",
+                    borderRadius: "0.5rem",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: isMobile ? "0.75rem" : "0.875rem",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  🎁 {isMobile ? "+5" : "+5min"}
+                </button>
+              )}
+
+              {isAdmin && chatAtivo && (
+                <button
+                  onClick={async () => {
+                    if (confirm("Finalizar consulta?")) {
+                      await finalizarSessao();
+                    }
+                  }}
+                  style={{
+                    padding: isMobile ? "0.4rem 0.8rem" : "0.5rem 1rem",
+                    backgroundColor: "rgb(220, 38, 38)",
+                    color: "white",
+                    borderRadius: "0.5rem",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: isMobile ? "0.75rem" : "0.875rem",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {isMobile ? "⏹️ Fim" : "⏹️ Finalizar"}
+                </button>
+              )}
+
+              {/* AJUSTADO: Texto mais claro no botão */}
+              {!isAdmin && chatAtivo && (
+                <button
+                  onClick={async () => {
+                    if (
+                      confirm(
+                        "Encerrar consulta? Você será cobrado pelo tempo usado."
+                      )
+                    ) {
+                      await finalizarSessao();
+                    }
+                  }}
+                  style={{
+                    padding: isMobile ? "0.4rem 0.8rem" : "0.5rem 1rem",
+                    backgroundColor: "rgb(220, 38, 38)",
+                    color: "white",
+                    borderRadius: "0.5rem",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: isMobile ? "0.7rem" : "0.875rem",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {isMobile ? "❌ Sair" : "❌ Encerrar"}
+                </button>
+              )}
+            </div>
+
+            {/* Timer */}
             {sessao && (
               <TimerMistico
                 tempoDecorrido={tempoDecorrido}
@@ -896,74 +984,11 @@ export default function ChatPage() {
                 onTempoEsgotado={finalizarSessao}
               />
             )}
-
-            {isAdmin && !sessao?.bonus_usado && chatAtivo && (
-              <button
-                onClick={darBonus}
-                style={{
-                  padding: isMobile ? "0.4rem 0.8rem" : "0.5rem 1rem",
-                  backgroundColor: "rgb(147, 51, 234)",
-                  color: "white",
-                  borderRadius: "0.5rem",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: isMobile ? "0.75rem" : "0.875rem",
-                }}
-              >
-                🎁 +5min
-              </button>
-            )}
-
-            {isAdmin && chatAtivo && (
-              <button
-                onClick={async () => {
-                  if (confirm("Finalizar consulta?")) {
-                    await finalizarSessao();
-                  }
-                }}
-                style={{
-                  padding: isMobile ? "0.4rem 0.8rem" : "0.5rem 1rem",
-                  backgroundColor: "rgb(220, 38, 38)",
-                  color: "white",
-                  borderRadius: "0.5rem",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: isMobile ? "0.75rem" : "0.875rem",
-                }}
-              >
-                ⏹️
-              </button>
-            )}
-
-            {!isAdmin && chatAtivo && (
-              <button
-                onClick={async () => {
-                  if (
-                    confirm(
-                      "Encerrar consulta? Você será cobrado pelo tempo usado."
-                    )
-                  ) {
-                    await finalizarSessao();
-                  }
-                }}
-                style={{
-                  padding: isMobile ? "0.4rem 0.8rem" : "0.5rem 1rem",
-                  backgroundColor: "rgb(220, 38, 38)",
-                  color: "white",
-                  borderRadius: "0.5rem",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: isMobile ? "0.75rem" : "0.875rem",
-                }}
-              >
-                ❌
-              </button>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Conteúdo - RESPONSIVO */}
+      {/* Conteúdo */}
       <div style={{ flex: 1, minHeight: 0, padding: "1rem" }}>
         <div
           style={{
@@ -975,13 +1000,8 @@ export default function ChatPage() {
             gap: "1rem",
           }}
         >
-          {/* MOBILE: Mesa horizontal no topo */}
           {isMobile && <MesaCartas mobile={true} />}
-
-          {/* DESKTOP: Mesa 50% */}
           {!isMobile && <MesaCartas mobile={false} />}
-
-          {/* Chat (mobile e desktop) */}
           <ChatMensagens mobile={isMobile} />
         </div>
       </div>
