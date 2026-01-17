@@ -8,6 +8,7 @@ import Link from "next/link";
 function SolicitarConsultaContent() {
   const [tarologo, setTarologo] = useState<any>(null);
   const [usuario, setUsuario] = useState<any>(null);
+  const [minutosEscolhidos, setMinutosEscolhidos] = useState(20); // NOVO
   const [loading, setLoading] = useState(true);
   const [aguardando, setAguardando] = useState(false);
   const [sessaoId, setSessaoId] = useState<string | null>(null);
@@ -61,8 +62,8 @@ function SolicitarConsultaContent() {
       .eq("id", user.id)
       .single();
 
-    if (!userData || userData.minutos_disponiveis <= 0) {
-      alert("Você precisa comprar minutos para iniciar uma consulta!");
+    if (!userData || userData.minutos_disponiveis < 20) {
+      alert("Você precisa de pelo menos 20 minutos para iniciar uma consulta!");
       router.push("/comprar-minutos");
       return;
     }
@@ -81,19 +82,33 @@ function SolicitarConsultaContent() {
 
     setUsuario(userData);
     setTarologo(tarologoData);
+
+    // Definir minutos escolhidos como o menor entre disponível e 60
+    setMinutosEscolhidos(Math.min(userData.minutos_disponiveis, 60));
+
     setLoading(false);
   }
 
   async function handleSolicitar() {
+    if (minutosEscolhidos < 20) {
+      alert("Mínimo de 20 minutos por consulta!");
+      return;
+    }
+
+    if (minutosEscolhidos > usuario.minutos_disponiveis) {
+      alert("Você não tem minutos suficientes!");
+      return;
+    }
+
     setAguardando(true);
 
-    // Criar sessão - vai usar TODO o saldo disponível do usuário
+    // Criar sessão aguardando aprovação
     const { data: sessao, error } = await supabase
       .from("sessoes")
       .insert({
         usuario_id: usuario.id,
         tarologo_id: tarologo.id,
-        minutos_comprados: usuario.minutos_disponiveis, // TODO O SALDO
+        minutos_comprados: minutosEscolhidos, // USAR OS MINUTOS ESCOLHIDOS
         status: "aguardando",
       })
       .select()
@@ -115,6 +130,7 @@ function SolicitarConsultaContent() {
     }
 
     await supabase.from("sessoes").delete().eq("id", sessaoId);
+
     router.push("/");
   }
 
@@ -143,9 +159,15 @@ function SolicitarConsultaContent() {
           </p>
 
           <div className="bg-white/5 rounded-lg p-4 mb-6">
+            <div className="flex justify-between text-white/80 text-sm mb-2">
+              <span>Minutos desta consulta:</span>
+              <span className="font-bold text-white">
+                {minutosEscolhidos} min
+              </span>
+            </div>
             <div className="flex justify-between text-white/80 text-sm">
-              <span>Seus minutos disponíveis:</span>
-              <span className="font-bold text-green-400">
+              <span>Seus minutos totais:</span>
+              <span className="font-bold text-white">
                 {usuario.minutos_disponiveis} min
               </span>
             </div>
@@ -160,6 +182,12 @@ function SolicitarConsultaContent() {
         </div>
       </div>
     );
+  }
+
+  // Opções de minutos disponíveis (múltiplos de 10, mínimo 20)
+  const opcoesMinutos = [];
+  for (let i = 20; i <= Math.min(usuario.minutos_disponiveis, 60); i += 10) {
+    opcoesMinutos.push(i);
   }
 
   return (
@@ -186,66 +214,67 @@ function SolicitarConsultaContent() {
             <p className="text-white/70 text-sm">{tarologo.biografia}</p>
           </div>
 
-          {/* Informações da consulta */}
-          <div className="bg-white/5 rounded-xl p-6 mb-6 space-y-3">
+          {/* Seletor de Minutos */}
+          <div className="bg-white/5 rounded-xl p-6 mb-6">
             <h3 className="text-lg font-bold text-white mb-4">
-              Como funciona?
+              Quantos minutos deseja usar?
             </h3>
 
-            <div className="space-y-3 text-white/80 text-sm">
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400">✨</span>
-                <p>
-                  Você tem{" "}
-                  <span className="font-bold text-green-400">
-                    {usuario.minutos_disponiveis} minutos
-                  </span>{" "}
-                  disponíveis
-                </p>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400">⏱️</span>
-                <p>
-                  O cronômetro começará quando o tarólogo aceitar e será{" "}
-                  <span className="font-bold">progressivo</span> (crescente)
-                </p>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400">🎯</span>
-                <p>
-                  Você pode{" "}
-                  <span className="font-bold">encerrar quando quiser</span> e
-                  será cobrado apenas pelo tempo utilizado
-                </p>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400">🎁</span>
-                <p>
-                  Durante a consulta, você pode receber{" "}
-                  <span className="font-bold">+5 minutos de bônus</span>
-                </p>
-              </div>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              {opcoesMinutos.map((min) => (
+                <button
+                  key={min}
+                  onClick={() => setMinutosEscolhidos(min)}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    minutosEscolhidos === min
+                      ? "bg-purple-600 border-purple-400 scale-105"
+                      : "bg-white/5 border-white/20 hover:bg-white/10"
+                  }`}
+                >
+                  <div className="text-2xl font-bold text-white">{min}</div>
+                  <div className="text-xs text-white/80">minutos</div>
+                </button>
+              ))}
             </div>
 
-            <div className="border-t border-white/20 pt-3 mt-4">
-              <div className="bg-purple-900/30 rounded-lg p-3">
-                <p className="text-white/80 text-sm">
-                  💡 <span className="font-bold">Importante:</span> O tempo será
-                  arredondado para cima. Se usar 15min e 30seg, será cobrado 16
-                  minutos.
-                </p>
-              </div>
+            <div className="bg-white/10 rounded-lg p-3 text-sm text-white/70">
+              💡 Você tem {usuario.minutos_disponiveis} minutos disponíveis.
+              Pode usar o resto em outra consulta!
             </div>
           </div>
 
-          {/* Saldo atual */}
-          <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-xl p-6 mb-6 border border-purple-400/30">
-            <div className="text-center">
-              <p className="text-purple-200 text-sm mb-2">Seu saldo atual:</p>
-              <p className="text-4xl font-bold text-white mb-1">
-                {usuario.minutos_disponiveis}
+          {/* Informações da consulta */}
+          <div className="bg-white/5 rounded-xl p-6 mb-6 space-y-3">
+            <h3 className="text-lg font-bold text-white mb-4">Resumo</h3>
+
+            <div className="flex justify-between text-white/80">
+              <span>Minutos desta consulta:</span>
+              <span className="font-bold text-white">
+                {minutosEscolhidos} min
+              </span>
+            </div>
+
+            <div className="flex justify-between text-white/80">
+              <span>Seus minutos totais:</span>
+              <span className="font-bold text-white">
+                {usuario.minutos_disponiveis} min
+              </span>
+            </div>
+
+            <div className="flex justify-between text-white/80">
+              <span>Restará após esta consulta:</span>
+              <span className="font-bold text-green-400">
+                {usuario.minutos_disponiveis - minutosEscolhidos} min
+              </span>
+            </div>
+
+            <div className="border-t border-white/20 pt-3 mt-3">
+              <p className="text-white/60 text-sm">
+                ⏱️ O cronômetro começará quando o tarólogo aceitar
               </p>
-              <p className="text-purple-200 text-sm">minutos disponíveis</p>
+              <p className="text-white/60 text-sm mt-2">
+                ✨ Você pode receber +5 minutos de bônus durante a consulta
+              </p>
             </div>
           </div>
 
@@ -253,9 +282,9 @@ function SolicitarConsultaContent() {
           <div className="space-y-3">
             <button
               onClick={handleSolicitar}
-              className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white font-bold text-lg rounded-xl transition-colors shadow-lg shadow-purple-500/50"
+              className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white font-bold text-lg rounded-xl transition-colors"
             >
-              🔮 Solicitar Consulta Agora
+              🔮 Solicitar Consulta ({minutosEscolhidos} min)
             </button>
 
             <Link

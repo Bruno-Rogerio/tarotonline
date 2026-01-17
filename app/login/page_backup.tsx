@@ -67,7 +67,9 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-800 flex items-center justify-center p-4">
       <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">🔮 Viaa Tarot</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            🔮 Tarot Místico
+          </h1>
           <p className="text-purple-200">Entre na sua conta</p>
         </div>
 

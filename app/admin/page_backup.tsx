@@ -34,15 +34,15 @@ type SessaoPendente = {
 };
 
 export default function AdminPage() {
-  const [abaAtiva, setAbaAtiva] = useState<"consultas" | "pagamentos">(
-    "consultas"
-  );
   const [comprasPendentes, setComprasPendentes] = useState<Compra[]>([]);
   const [sessoesPendentes, setSessoesPendentes] = useState<SessaoPendente[]>(
     []
   );
-  const [adminId, setAdminId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [adminId, setAdminId] = useState<string>("");
+  const [abaAtiva, setAbaAtiva] = useState<"pagamentos" | "consultas">(
+    "consultas"
+  );
   const router = useRouter();
 
   useEffect(() => {
@@ -65,8 +65,8 @@ export default function AdminPage() {
       .eq("id", user.id)
       .single();
 
-    if (!userData || userData.tipo !== "admin") {
-      alert("Apenas admins podem acessar.");
+    if (userData?.tipo !== "admin") {
+      alert("Acesso negado! Apenas admins podem acessar.");
       router.push("/");
       return;
     }
@@ -129,6 +129,8 @@ export default function AdminPage() {
   }
 
   async function carregarSessoesPendentes() {
+    console.log("🔍 Carregando sessões pendentes...");
+
     const { data, error } = await supabase
       .from("sessoes")
       .select(
@@ -144,6 +146,9 @@ export default function AdminPage() {
       )
       .eq("status", "aguardando")
       .order("created_at", { ascending: false });
+
+    console.log("📊 Sessões encontradas:", data);
+    console.log("❌ Erro:", error);
 
     if (!error && data) {
       setSessoesPendentes(data as any);
@@ -193,15 +198,29 @@ export default function AdminPage() {
   async function aceitarConsulta(sessao: SessaoPendente) {
     setLoading(true);
 
-    // Atualizar sessão para em_andamento
+    // Pega o ID do admin na hora (garante que está atualizado)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert("Erro: Usuário não autenticado");
+      setLoading(false);
+      return;
+    }
+
+    console.log("👤 Aceitando consulta com admin_id:", user.id);
+
     const { error } = await supabase
       .from("sessoes")
       .update({
         status: "em_andamento",
-        admin_id: adminId,
+        admin_id: user.id, // Usa direto do user
         inicio: new Date().toISOString(),
       })
       .eq("id", sessao.id);
+
+    console.log("✅ Update resultado:", { error });
 
     if (error) {
       alert("Erro ao aceitar consulta: " + error.message);
@@ -323,7 +342,7 @@ export default function AdminPage() {
                           </div>
                           <div>
                             <span className="text-white/60">
-                              Saldo disponível:{" "}
+                              Minutos disponíveis:{" "}
                             </span>
                             <span className="text-green-400 font-bold">
                               {sessao.usuario.minutos_disponiveis} min
@@ -352,15 +371,11 @@ export default function AdminPage() {
                               {sessao.tarologo.nome}
                             </span>
                           </div>
-                          <div className="bg-purple-900/30 rounded-lg p-3 mt-3">
-                            <p className="text-white/80 text-sm">
-                              ⏱️{" "}
-                              <span className="font-bold">Novo sistema:</span>{" "}
-                              Timer progressivo, cliente usa o tempo que quiser
-                              até esgotar os{" "}
-                              {sessao.usuario.minutos_disponiveis} minutos
-                              disponíveis
-                            </p>
+                          <div>
+                            <span className="text-white/60">Duração: </span>
+                            <span className="text-white font-bold">
+                              {sessao.minutos_comprados} minutos
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -422,6 +437,12 @@ export default function AdminPage() {
                             <span className="text-white/60">Telefone: </span>
                             {compra.usuarios.telefone}
                           </div>
+                          <div>
+                            <span className="text-white/60">Data: </span>
+                            {new Date(compra.created_at).toLocaleString(
+                              "pt-BR"
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -432,21 +453,15 @@ export default function AdminPage() {
                         <div className="space-y-2 text-white/80">
                           <div>
                             <span className="text-white/60">Minutos: </span>
-                            <span className="font-bold text-green-400">
+                            <span className="text-white font-bold">
                               {compra.minutos} min
                             </span>
                           </div>
                           <div>
                             <span className="text-white/60">Valor: </span>
-                            <span className="font-bold text-white">
+                            <span className="text-green-400 font-bold">
                               R$ {compra.valor.toFixed(2)}
                             </span>
-                          </div>
-                          <div>
-                            <span className="text-white/60">Data: </span>
-                            {new Date(compra.created_at).toLocaleString(
-                              "pt-BR"
-                            )}
                           </div>
                         </div>
                       </div>

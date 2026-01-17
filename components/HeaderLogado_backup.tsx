@@ -23,7 +23,7 @@ export default function HeaderLogado({ usuario }: { usuario: Usuario }) {
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link href="/">
           <h1 className="text-2xl font-bold text-white flex items-center gap-2 cursor-pointer hover:text-purple-200 transition-colors">
-            🔮 Viaa Tarot
+            🔮 Tarot Místico
           </h1>
         </Link>
 
@@ -37,13 +37,14 @@ export default function HeaderLogado({ usuario }: { usuario: Usuario }) {
             {usuario.minutos_disponiveis} min
           </div>
 
-          {/* Botão Comprar Créditos - SEMPRE VISÍVEL */}
-          <Link
-            href="/comprar-minutos"
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors text-sm font-medium"
-          >
-            💳 Comprar créditos
-          </Link>
+          {usuario.minutos_disponiveis === 0 && (
+            <Link
+              href="/comprar-minutos"
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors text-sm"
+            >
+              Comprar minutos
+            </Link>
+          )}
 
           {usuario.tipo === "admin" && (
             <Link

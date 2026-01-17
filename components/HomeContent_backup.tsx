@@ -318,7 +318,7 @@ export default function HomeContent({
         <header className="bg-black/20 backdrop-blur-sm border-b border-white/10">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              🔮 Viaa Tarot
+              🔮 Tarot Místico
             </h1>
             <Link
               href="/login"
@@ -365,7 +365,7 @@ export default function HomeContent({
       {/* Footer */}
       <footer className="bg-black/30 backdrop-blur-sm border-t border-white/10 py-8 mt-16">
         <div className="container mx-auto px-4 text-center text-purple-200">
-          <p>© 2025 Viaa Tarot - Todos os direitos reservados</p>
+          <p>© 2025 Tarot Místico - Todos os direitos reservados</p>
         </div>
       </footer>
     </div>

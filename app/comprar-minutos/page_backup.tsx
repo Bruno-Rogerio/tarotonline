@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -10,27 +10,23 @@ export default function ComprarMinutosPage() {
   const [minutosEscolhidos, setMinutosEscolhidos] = useState(20);
   const [loading, setLoading] = useState(true);
   const [mostrarPix, setMostrarPix] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState("");
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const router = useRouter();
 
   const PRECO_POR_MINUTO = 1.99;
   const valorTotal = (minutosEscolhidos * PRECO_POR_MINUTO).toFixed(2);
 
-  // Dados PIX - do certificado MEI
-  const CHAVE_PIX_CNPJ = "57129530000151"; // CNPJ sem formatação
-  const BENEFICIARIO = "57.129.530 RAIZA MARTINS CONVENTO"; // Nome empresarial completo
-  const CIDADE = "SAO PAULO"; // Sem acento
+  // Dados PIX mockup (estáticos por enquanto)
+  const pixData = {
+    chavePix: "11999999999", // Coloque sua chave PIX aqui
+    beneficiario: "Tarot Místico",
+    cidade: "São Paulo",
+    codigoPix:
+      "00020126580014br.gov.bcb.pix0136your-pix-key-here52040000530398654041.005802BR5913Tarot Mistico6009Sao Paulo62070503***63041D3D",
+  };
 
   useEffect(() => {
     verificarUsuario();
   }, []);
-
-  useEffect(() => {
-    if (mostrarPix && canvasRef.current) {
-      gerarQRCode();
-    }
-  }, [mostrarPix, minutosEscolhidos]);
 
   async function verificarUsuario() {
     const {
@@ -52,107 +48,18 @@ export default function ComprarMinutosPage() {
     setLoading(false);
   }
 
-  // Gerar código PIX copia e cola (padrão EMV) para CNPJ
-  function gerarCodigoPix(): string {
-    const valor = parseFloat(valorTotal);
-
-    // Payload Format Indicator
-    let payload = "000201"; // Versão do payload
-
-    // Point of Initiation Method (opcional)
-    payload += "010212"; // 01 = static, 02 = dynamic
-
-    // Merchant Account Information (ID 26 para PIX)
-    let merchantInfo = "";
-    merchantInfo += "0014br.gov.bcb.pix"; // GUI do PIX (fixo)
-    merchantInfo +=
-      "01" + CHAVE_PIX_CNPJ.length.toString().padStart(2, "0") + CHAVE_PIX_CNPJ; // Chave PIX
-
-    payload +=
-      "26" + merchantInfo.length.toString().padStart(2, "0") + merchantInfo;
-
-    // Merchant Category Code
-    payload += "52040000"; // MCC genérico
-
-    // Transaction Currency (BRL = 986)
-    payload += "5303986";
-
-    // Transaction Amount
-    const valorStr = valor.toFixed(2);
-    payload += "54" + valorStr.length.toString().padStart(2, "0") + valorStr;
-
-    // Country Code
-    payload += "5802BR";
-
-    // Merchant Name (máximo 25 caracteres)
-    const nomeFormatado = BENEFICIARIO.substring(0, 25);
-    payload +=
-      "59" + nomeFormatado.length.toString().padStart(2, "0") + nomeFormatado;
-
-    // Merchant City (máximo 15 caracteres, sem acento)
-    const cidadeFormatada = CIDADE.substring(0, 15);
-    payload +=
-      "60" +
-      cidadeFormatada.length.toString().padStart(2, "0") +
-      cidadeFormatada;
-
-    // Additional Data Field Template (ID 62) - opcional mas recomendado
-    let additionalData = "";
-    additionalData += "05" + "03***"; // 05 = Reference Label
-    payload +=
-      "62" + additionalData.length.toString().padStart(2, "0") + additionalData;
-
-    // CRC16 (sempre por último)
-    payload += "6304";
-    const crc = calcularCRC16(payload);
-    payload += crc;
-
-    return payload;
-  }
-
-  // Calcular CRC16-CCITT (polinômio 0x1021)
-  function calcularCRC16(str: string): string {
-    let crc = 0xffff;
-
-    for (let i = 0; i < str.length; i++) {
-      crc ^= str.charCodeAt(i) << 8;
-
-      for (let j = 0; j < 8; j++) {
-        if ((crc & 0x8000) !== 0) {
-          crc = (crc << 1) ^ 0x1021;
-        } else {
-          crc = crc << 1;
-        }
-      }
-    }
-
-    crc = crc & 0xffff;
-    return crc.toString(16).toUpperCase().padStart(4, "0");
-  }
-
-  async function gerarQRCode() {
-    const codigoPix = gerarCodigoPix();
-
-    // Usar API do QR Server
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
-      codigoPix
-    )}`;
-    setQrCodeUrl(qrUrl);
-
-    console.log("📋 Código PIX gerado:", codigoPix);
-  }
-
   async function handleJaPaguei() {
     if (!usuario) return;
 
     setLoading(true);
 
+    // Registrar a compra como PENDENTE (aguardando aprovação)
     const { error } = await supabase.from("compras").insert({
       usuario_id: usuario.id,
       minutos: minutosEscolhidos,
       valor: parseFloat(valorTotal),
-      status: "pendente",
-      pix_codigo: gerarCodigoPix(),
+      status: "pendente", // Aguardando aprovação do admin
+      pix_codigo: pixData.codigoPix,
     });
 
     if (error) {
@@ -181,13 +88,12 @@ export default function ComprarMinutosPage() {
   }
 
   if (mostrarPix) {
-    const codigoPix = gerarCodigoPix();
-
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-800 p-4">
+        {/* Header */}
         <header className="bg-black/20 backdrop-blur-sm border-b border-white/10 mb-8">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-white">🔮 Viaa Tarot</h1>
+            <h1 className="text-2xl font-bold text-white">🔮 Tarot Místico</h1>
             <div className="flex items-center gap-4">
               <span className="text-white">Olá, {usuario?.nome}</span>
               <button
@@ -217,68 +123,59 @@ export default function ComprarMinutosPage() {
               </div>
             </div>
 
+            {/* QR Code Mockup */}
             <div className="bg-white rounded-xl p-6 mb-6">
               <div className="text-center">
-                <div className="text-gray-600 mb-4 font-semibold">
-                  Escaneie o QR Code:
-                </div>
-                {qrCodeUrl ? (
-                  <img
-                    src={qrCodeUrl}
-                    alt="QR Code PIX"
-                    className="w-64 h-64 mx-auto rounded-lg border-4 border-gray-200"
-                  />
-                ) : (
-                  <div className="w-64 h-64 mx-auto bg-gray-200 rounded-lg flex items-center justify-center">
-                    <div className="text-gray-400">Gerando QR Code...</div>
+                <div className="text-gray-600 mb-4">Escaneie o QR Code:</div>
+                <div className="w-64 h-64 mx-auto bg-gray-200 rounded-lg flex items-center justify-center">
+                  <div className="text-gray-400 text-center">
+                    <div className="text-6xl mb-2">📱</div>
+                    <div className="text-sm">QR Code PIX</div>
+                    <div className="text-xs">(Mockup)</div>
                   </div>
-                )}
+                </div>
               </div>
             </div>
 
+            {/* Código PIX */}
             <div className="bg-white/5 rounded-xl p-6 mb-6">
-              <div className="text-white text-sm mb-2 font-semibold">
+              <div className="text-white text-sm mb-2">
                 Ou copie o código PIX:
               </div>
-              <div className="bg-black/30 rounded-lg p-4 break-all text-white text-xs font-mono leading-relaxed max-h-32 overflow-y-auto">
-                {codigoPix}
+              <div className="bg-black/30 rounded-lg p-4 break-all text-white text-sm font-mono">
+                {pixData.codigoPix}
               </div>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(codigoPix);
-                  alert("✅ Código PIX copiado!");
+                  navigator.clipboard.writeText(pixData.codigoPix);
+                  alert("Código PIX copiado!");
                 }}
-                className="w-full mt-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
+                className="w-full mt-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
               >
                 📋 Copiar código PIX
               </button>
             </div>
 
+            {/* Dados do beneficiário */}
             <div className="bg-white/5 rounded-xl p-6 mb-6 text-white text-sm">
-              <div className="font-semibold mb-3 text-purple-200">
-                Dados do beneficiário:
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-white/60">Beneficiário:</span>
-                  <span className="font-medium">{BENEFICIARIO}</span>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-white/60">Beneficiário:</div>
+                  <div>{pixData.beneficiario}</div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-white/60">CNPJ:</span>
-                  <span className="font-medium">57.129.530/0001-51</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-white/60">Cidade:</span>
-                  <span className="font-medium">São Paulo - SP</span>
+                <div>
+                  <div className="text-white/60">Chave PIX:</div>
+                  <div>{pixData.chavePix}</div>
                 </div>
               </div>
             </div>
 
+            {/* Botões */}
             <div className="space-y-3">
               <button
                 onClick={handleJaPaguei}
                 disabled={loading}
-                className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white font-bold rounded-lg transition-colors shadow-lg"
+                className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white font-medium rounded-lg transition-colors"
               >
                 ✅ Já realizei o pagamento
               </button>
@@ -290,24 +187,22 @@ export default function ComprarMinutosPage() {
               </button>
             </div>
 
-            <div className="mt-6 text-center text-white/70 text-sm bg-purple-900/30 rounded-lg p-4">
-              💡 <span className="font-semibold">Importante:</span> Após
-              realizar o pagamento, clique em "Já realizei o pagamento". Aguarde
-              a aprovação por nossa equipe (geralmente em poucos minutos).
+            <div className="mt-6 text-center text-white/60 text-sm">
+              💡 Após confirmar, aguarde a aprovação do pagamento por nossa
+              equipe
             </div>
           </div>
         </div>
-
-        <canvas ref={canvasRef} style={{ display: "none" }} />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-800 p-4">
+      {/* Header */}
       <header className="bg-black/20 backdrop-blur-sm border-b border-white/10 mb-8">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-white">🔮 Viaa Tarot</h1>
+          <h1 className="text-2xl font-bold text-white">🔮 Tarot Místico</h1>
           <div className="flex items-center gap-4">
             <div className="text-white">
               <span className="text-white/60">Olá, </span>
@@ -335,6 +230,7 @@ export default function ComprarMinutosPage() {
             Escolha quantos minutos deseja adicionar à sua conta
           </p>
 
+          {/* Seletor de Minutos */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
             {[20, 30, 40, 50, 60].map((minutos) => {
               const valor = (minutos * PRECO_POR_MINUTO).toFixed(2);
@@ -360,6 +256,7 @@ export default function ComprarMinutosPage() {
             })}
           </div>
 
+          {/* Resumo */}
           <div className="bg-white/5 rounded-xl p-6 mb-6">
             <div className="flex justify-between items-center mb-2">
               <span className="text-white/80">Minutos selecionados:</span>
@@ -381,9 +278,10 @@ export default function ComprarMinutosPage() {
             </div>
           </div>
 
+          {/* Botão Continuar */}
           <button
             onClick={() => setMostrarPix(true)}
-            className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white font-bold text-lg rounded-xl transition-colors shadow-lg"
+            className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white font-bold text-lg rounded-xl transition-colors"
           >
             Continuar para pagamento →
           </button>

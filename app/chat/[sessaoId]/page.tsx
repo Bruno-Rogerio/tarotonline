@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import TimerMistico from "@/components/Timermistico";
 
 type Mensagem = {
   id: string;
@@ -27,7 +28,7 @@ type Sessao = {
   bonus_usado: boolean;
   status: string;
   inicio: string;
-  usuario: { nome: string };
+  usuario: { nome: string; minutos_disponiveis: number };
   tarologo: { nome: string };
 };
 
@@ -126,7 +127,7 @@ export default function ChatPage() {
   const [novaMensagem, setNovaMensagem] = useState("");
   const [novaCarta, setNovaCarta] = useState("");
   const [buscarCarta, setBuscarCarta] = useState("");
-  const [tempoRestante, setTempoRestante] = useState(0);
+  const [tempoDecorrido, setTempoDecorrido] = useState(0); // MUDANÇA: agora é progressivo em SEGUNDOS
   const [chatAtivo, setChatAtivo] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -179,7 +180,7 @@ export default function ChatPage() {
     const { data: sessaoData } = await supabase
       .from("sessoes")
       .select(
-        `*, usuario:usuarios!sessoes_usuario_id_fkey(nome), tarologo:tarologos(nome)`
+        `*, usuario:usuarios!sessoes_usuario_id_fkey(nome, minutos_disponiveis), tarologo:tarologos(nome)`
       )
       .eq("id", sessaoId)
       .single();
@@ -222,7 +223,7 @@ export default function ChatPage() {
           filter: `sessao_id=eq.${sessaoId}`,
         },
         (payload) => {
-          console.log("🗑️ DELETE recebido:", payload);
+          console.log("💬 Nova mensagem recebida:", payload);
           setMensagens((prev) => [...prev, payload.new as Mensagem]);
         }
       )
@@ -290,7 +291,7 @@ export default function ChatPage() {
             console.log("⏰ Sessão finalizada detectada!");
             setChatAtivo(false);
             if (timerRef.current) clearInterval(timerRef.current);
-            alert("⏰ Tempo esgotado!");
+            alert("⏰ Consulta finalizada!");
             setTimeout(() => router.push("/"), 3000);
           }
         }
@@ -312,16 +313,20 @@ export default function ChatPage() {
     };
   }
 
+  // MUDANÇA: Timer agora é progressivo (crescente)
   function iniciarTimer() {
     if (!sessao) return;
     const inicio = new Date(sessao.inicio).getTime();
-    const totalSeg = sessao.minutos_comprados * 60;
 
     const atualizar = () => {
-      const decorrido = Math.floor((Date.now() - inicio) / 1000);
-      const restante = totalSeg - decorrido;
-      setTempoRestante(restante / 60);
-      if (restante <= 0) finalizarSessao();
+      const decorrido = Math.floor((Date.now() - inicio) / 1000); // SEGUNDOS
+      setTempoDecorrido(decorrido);
+
+      // Verificar se esgotou saldo (converter minutos para segundos)
+      const saldoSegundos = sessao.minutos_comprados * 60;
+      if (decorrido >= saldoSegundos) {
+        finalizarSessao();
+      }
     };
 
     atualizar();
@@ -346,38 +351,46 @@ export default function ChatPage() {
     if (data) setCartas(data);
   }
 
+  // MUDANÇA: Finalizar agora deduz apenas o tempo usado (arredondado pra cima)
   async function finalizarSessao() {
     console.log("🛑 Finalizando sessão...", sessaoId);
     if (timerRef.current) clearInterval(timerRef.current);
     setChatAtivo(false);
 
+    if (!sessao) return;
+
+    // Calcular tempo usado em minutos - ARREDONDAR PRA CIMA
+    const minutosUsados = Math.ceil(tempoDecorrido / 60);
+
     const { error, data } = await supabase
       .from("sessoes")
-      .update({ status: "finalizada", fim: new Date().toISOString() })
+      .update({
+        status: "finalizada",
+        fim: new Date().toISOString(),
+        minutos_usados: minutosUsados, // Salvar tempo usado
+      })
       .eq("id", sessaoId)
-      .select(); // TUDO NA MESMA CADEIA
+      .select();
 
     console.log("🛑 Update executado:", { error, data });
 
-    if (sessao) {
-      const { data: u } = await supabase
+    // Deduzir APENAS o tempo usado do saldo do usuário
+    const { data: u } = await supabase
+      .from("usuarios")
+      .select("minutos_disponiveis")
+      .eq("id", sessao.usuario_id)
+      .single();
+
+    if (u) {
+      const novoSaldo = Math.max(0, u.minutos_disponiveis - minutosUsados);
+
+      await supabase
         .from("usuarios")
-        .select("minutos_disponiveis")
-        .eq("id", sessao.usuario_id)
-        .single();
-      if (u) {
-        await supabase
-          .from("usuarios")
-          .update({
-            minutos_disponiveis: Math.max(
-              0,
-              u.minutos_disponiveis - sessao.minutos_comprados
-            ),
-          })
-          .eq("id", sessao.usuario_id);
-      }
+        .update({ minutos_disponiveis: novoSaldo })
+        .eq("id", sessao.usuario_id);
     }
-    alert("⏰ Tempo esgotado!");
+
+    alert(`⏰ Consulta finalizada! Tempo utilizado: ${minutosUsados} minutos`);
     setTimeout(() => router.push("/"), 3000);
   }
 
@@ -426,27 +439,40 @@ export default function ChatPage() {
     console.log("✅ Todas as cartas foram deletadas!");
   }
 
+  // MUDANÇA: Bônus agora adiciona ao saldo do usuário também
   async function darBonus() {
     if (!isAdmin || !sessao || sessao.bonus_usado || !confirm("Dar +5min?"))
       return;
-    await supabase
-      .from("sessoes")
-      .update({
-        minutos_comprados: sessao.minutos_comprados + 5,
-        bonus_usado: true,
-      })
-      .eq("id", sessaoId);
-    await supabase.from("mensagens").insert({
-      sessao_id: sessaoId,
-      remetente_id: usuarioId,
-      mensagem: "🎁 Você ganhou +5 minutos de bônus!",
-    });
-  }
 
-  function formatarTempo(min: number) {
-    const m = Math.floor(min);
-    const s = Math.floor((min - m) * 60);
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    // Adicionar 5 minutos ao SALDO do usuário
+    const { data: usuario } = await supabase
+      .from("usuarios")
+      .select("minutos_disponiveis")
+      .eq("id", sessao.usuario_id)
+      .single();
+
+    if (usuario) {
+      await supabase
+        .from("usuarios")
+        .update({
+          minutos_disponiveis: usuario.minutos_disponiveis + 5,
+        })
+        .eq("id", sessao.usuario_id);
+
+      await supabase
+        .from("sessoes")
+        .update({
+          minutos_comprados: sessao.minutos_comprados + 5, // Atualiza saldo da sessão
+          bonus_usado: true,
+        })
+        .eq("id", sessaoId);
+
+      await supabase.from("mensagens").insert({
+        sessao_id: sessaoId,
+        remetente_id: usuarioId,
+        mensagem: "🎁 Você ganhou +5 minutos de bônus!",
+      });
+    }
   }
 
   function getNome(id: string) {
@@ -517,27 +543,16 @@ export default function ChatPage() {
             </p>
           </div>
           <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-            <div
-              style={{
-                padding: "0.75rem 1.5rem",
-                borderRadius: "9999px",
-                fontWeight: "bold",
-                fontSize: "1.5rem",
-                color: "white",
-                backgroundColor:
-                  tempoRestante <= 5
-                    ? "rgb(220, 38, 38)"
-                    : tempoRestante <= 10
-                    ? "rgb(202, 138, 4)"
-                    : "rgb(22, 163, 74)",
-                animation:
-                  tempoRestante <= 5
-                    ? "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite"
-                    : "none",
-              }}
-            >
-              ⏱️ {formatarTempo(tempoRestante)}
-            </div>
+            {/* MUDANÇA: Timer Místico Progressivo */}
+            {sessao && (
+              <TimerMistico
+                tempoDecorrido={tempoDecorrido}
+                saldoTotal={sessao.minutos_comprados}
+                onTempoEsgotado={finalizarSessao}
+              />
+            )}
+
+            {/* Botão Bônus */}
             {isAdmin && !sessao?.bonus_usado && chatAtivo && (
               <button
                 onClick={darBonus}
@@ -553,12 +568,36 @@ export default function ChatPage() {
                 🎁 Dar +5min
               </button>
             )}
+
+            {/* MUDANÇA: Botão Finalizar para Admin */}
+            {isAdmin && chatAtivo && (
+              <button
+                onClick={async () => {
+                  if (confirm("Tem certeza que deseja finalizar a consulta?")) {
+                    await finalizarSessao();
+                  }
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "rgb(220, 38, 38)",
+                  color: "white",
+                  borderRadius: "0.5rem",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "0.875rem",
+                }}
+              >
+                ⏹️ Finalizar
+              </button>
+            )}
+
+            {/* Botão Encerrar (Cliente) */}
             {!isAdmin && chatAtivo && (
               <button
                 onClick={async () => {
                   if (
                     confirm(
-                      "⚠️ Tem certeza que deseja encerrar a consulta? Você perderá os minutos restantes."
+                      "Tem certeza que deseja encerrar a consulta? Você será cobrado pelo tempo usado."
                     )
                   ) {
                     await finalizarSessao();
