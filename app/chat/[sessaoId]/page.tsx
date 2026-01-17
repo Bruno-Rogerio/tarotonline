@@ -79,7 +79,6 @@ export default function ChatPage() {
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const shouldScrollRef = useRef(true); // NOVO: controle de scroll
 
   const cartasFiltradas = buscarCarta
     ? CARTAS_TAROT.filter((c) =>
@@ -108,11 +107,14 @@ export default function ChatPage() {
     if (sessao?.status === "em_andamento") iniciarTimer();
   }, [sessao]);
 
-  // CORRIGIDO: Scroll inteligente - só scroll se shouldScrollRef for true
+  // CORRIGIDO: Scroll sempre pro FINAL (não pro topo!)
   useEffect(() => {
-    if (shouldScrollRef.current && messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop =
-        messagesContainerRef.current.scrollHeight;
+    if (messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      // Forçar scroll pro FINAL
+      setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+      }, 100);
     }
   }, [mensagens]);
 
@@ -157,7 +159,9 @@ export default function ChatPage() {
 
     if (sessaoData.status === "finalizada") {
       setChatAtivo(false);
-      setTimeout(() => router.push("/"), 3000);
+      alert("⏰ Consulta já foi finalizada!");
+      setTimeout(() => router.push("/"), 2000);
+      return;
     }
 
     await carregarMensagens();
@@ -174,7 +178,7 @@ export default function ChatPage() {
           filter: `sessao_id=eq.${sessaoId}`,
         },
         (payload) => {
-          shouldScrollRef.current = true; // ATIVA scroll para nova mensagem
+          console.log("💬 Nova mensagem:", payload);
           setMensagens((prev) => [...prev, payload.new as Mensagem]);
         }
       )
@@ -191,6 +195,7 @@ export default function ChatPage() {
           filter: `sessao_id=eq.${sessaoId}`,
         },
         (payload) => {
+          console.log("🎴 Nova carta:", payload);
           setCartas((prev) => [...prev, payload.new as CartaMesa]);
         }
       )
@@ -203,6 +208,7 @@ export default function ChatPage() {
           filter: `sessao_id=eq.${sessaoId}`,
         },
         (payload) => {
+          console.log("🗑️ Carta removida:", payload);
           setCartas((prev) =>
             prev.filter((c) => c.id !== (payload.old as any).id)
           );
@@ -210,6 +216,7 @@ export default function ChatPage() {
       )
       .subscribe();
 
+    // CORRIGIDO: Listener de sessão mais robusto
     const canalSessao = supabase
       .channel(`sess-${sessaoId}-${Date.now()}`)
       .on(
@@ -221,17 +228,29 @@ export default function ChatPage() {
           filter: `id=eq.${sessaoId}`,
         },
         (payload) => {
+          console.log("🔄 Sessão atualizada:", payload);
           const nova = payload.new as any;
+
           setSessao((prev) => (prev ? { ...prev, ...nova } : null));
+
           if (nova.status === "finalizada") {
+            console.log("⏰ SESSÃO FINALIZADA - Encerrando...");
             setChatAtivo(false);
             if (timerRef.current) clearInterval(timerRef.current);
+
             alert("⏰ Consulta finalizada!");
-            setTimeout(() => router.push("/"), 3000);
+
+            // Redirecionar ambos os usuários
+            setTimeout(() => {
+              router.push("/");
+              router.refresh();
+            }, 2000);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("📡 Canal sessão status:", status);
+      });
 
     setLoading(false);
 
@@ -279,6 +298,7 @@ export default function ChatPage() {
   }
 
   async function finalizarSessao() {
+    console.log("🛑 Finalizando sessão...", sessaoId);
     if (timerRef.current) clearInterval(timerRef.current);
     setChatAtivo(false);
 
@@ -286,7 +306,7 @@ export default function ChatPage() {
 
     const minutosUsados = Math.ceil(tempoDecorrido / 60);
 
-    await supabase
+    const { error } = await supabase
       .from("sessoes")
       .update({
         status: "finalizada",
@@ -294,6 +314,10 @@ export default function ChatPage() {
         minutos_usados: minutosUsados,
       })
       .eq("id", sessaoId);
+
+    if (error) {
+      console.error("❌ Erro ao finalizar:", error);
+    }
 
     const { data: u } = await supabase
       .from("usuarios")
@@ -310,14 +334,16 @@ export default function ChatPage() {
     }
 
     alert(`⏰ Consulta finalizada! Tempo utilizado: ${minutosUsados} minutos`);
-    setTimeout(() => router.push("/"), 3000);
+
+    setTimeout(() => {
+      router.push("/");
+      router.refresh();
+    }, 2000);
   }
 
   async function enviarMensagem(e: React.FormEvent) {
     e.preventDefault();
     if (!novaMensagem.trim() || !chatAtivo) return;
-
-    shouldScrollRef.current = true; // ATIVA scroll para mensagem enviada
 
     await supabase.from("mensagens").insert({
       sessao_id: sessaoId,
@@ -326,18 +352,6 @@ export default function ChatPage() {
     });
     setNovaMensagem("");
   }
-
-  // NOVO: Handler para detectar scroll manual
-  const handleScroll = () => {
-    if (!messagesContainerRef.current) return;
-
-    const { scrollTop, scrollHeight, clientHeight } =
-      messagesContainerRef.current;
-    const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 50;
-
-    // Se não está no final, desativa auto-scroll
-    shouldScrollRef.current = isAtBottom;
-  };
 
   async function adicionarCarta(e: React.FormEvent) {
     e.preventDefault();
@@ -417,7 +431,7 @@ export default function ChatPage() {
     <div
       style={{
         flex: mobile ? "none" : 1,
-        height: mobile ? "200px" : "auto", // AJUSTADO: 180px → 200px
+        height: mobile ? "220px" : "auto", // AUMENTADO: 200px → 220px
         minWidth: 0,
         backgroundColor: "rgba(255,255,255,0.1)",
         backdropFilter: "blur(4px)",
@@ -487,7 +501,7 @@ export default function ChatPage() {
               <div
                 key={carta.id}
                 style={{
-                  width: mobile ? "130px" : "calc(33.333% - 0.35rem)", // AJUSTADO: 120px → 130px
+                  width: mobile ? "135px" : "calc(33.333% - 0.35rem)", // AUMENTADO
                   flexShrink: 0,
                 }}
               >
@@ -498,13 +512,13 @@ export default function ChatPage() {
                     borderRadius: "0.5rem",
                     border: "2px solid rgb(113, 63, 18)",
                     boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                    padding: "0.5rem",
+                    padding: "0.4rem", // REDUZIDO: 0.5rem → 0.4rem
                     display: "flex",
                     flexDirection: "column",
                     position: "relative",
                     aspectRatio: "2/3",
-                    height: mobile ? "195px" : "auto", // AJUSTADO: 180px → 195px
-                    maxHeight: mobile ? "195px" : "180px",
+                    height: mobile ? "203px" : "auto", // AUMENTADO
+                    maxHeight: mobile ? "203px" : "180px",
                     overflow: "hidden",
                   }}
                 >
@@ -525,6 +539,7 @@ export default function ChatPage() {
                     #{carta.ordem}
                   </div>
 
+                  {/* IMAGEM - mais espaço */}
                   <div
                     style={{
                       flex: 1,
@@ -533,6 +548,7 @@ export default function ChatPage() {
                       justifyContent: "center",
                       overflow: "hidden",
                       borderRadius: "0.25rem",
+                      marginBottom: "0.3rem", // Espaço pro nome
                     }}
                   >
                     {imagemUrl ? (
@@ -562,12 +578,13 @@ export default function ChatPage() {
                     )}
                   </div>
 
+                  {/* NOME - fixo embaixo */}
                   <div
                     style={{
-                      backgroundColor: "rgba(0,0,0,0.8)",
-                      padding: "0.25rem",
+                      backgroundColor: "rgba(0,0,0,0.9)",
+                      padding: "0.3rem", // AUMENTADO: 0.25rem → 0.3rem
                       borderRadius: "0.25rem",
-                      marginTop: "0.25rem",
+                      flexShrink: 0, // NÃO encolhe
                     }}
                   >
                     <p
@@ -576,7 +593,8 @@ export default function ChatPage() {
                         fontWeight: "bold",
                         textAlign: "center",
                         fontSize: "10px",
-                        lineHeight: "1.25",
+                        lineHeight: "1.2",
+                        margin: 0,
                       }}
                     >
                       {carta.nome_carta}
@@ -715,12 +733,13 @@ export default function ChatPage() {
     >
       <div
         ref={messagesContainerRef}
-        onScroll={handleScroll} // NOVO: detecta scroll manual
         style={{
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
           padding: "0.75rem",
+          display: "flex",
+          flexDirection: "column", // IMPORTANTE
         }}
       >
         <div
@@ -896,17 +915,15 @@ export default function ChatPage() {
             </p>
           </div>
 
-          {/* AJUSTADO: Timer à direita no mobile */}
           <div
             style={{
               display: "flex",
               gap: isMobile ? "0.5rem" : "1rem",
               alignItems: "center",
               flexWrap: "wrap",
-              flexDirection: isMobile ? "row-reverse" : "row", // INVERTIDO
+              flexDirection: isMobile ? "row-reverse" : "row",
             }}
           >
-            {/* Botões */}
             <div style={{ display: "flex", gap: "0.5rem" }}>
               {isAdmin && !sessao?.bonus_usado && chatAtivo && (
                 <button
@@ -948,7 +965,6 @@ export default function ChatPage() {
                 </button>
               )}
 
-              {/* AJUSTADO: Texto mais claro no botão */}
               {!isAdmin && chatAtivo && (
                 <button
                   onClick={async () => {
@@ -976,7 +992,6 @@ export default function ChatPage() {
               )}
             </div>
 
-            {/* Timer */}
             {sessao && (
               <TimerMistico
                 tempoDecorrido={tempoDecorrido}
