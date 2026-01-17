@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import TimerMistico from "@/components/Timermistico";
-import { getImagemCarta } from "@/lib/getImagemCarta"; // ADICIONADO
+import { getImagemCarta } from "@/lib/getImagemCarta";
 
 type Mensagem = {
   id: string;
@@ -75,6 +75,7 @@ export default function ChatPage() {
   const [tempoDecorrido, setTempoDecorrido] = useState(0);
   const [chatAtivo, setChatAtivo] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -84,6 +85,16 @@ export default function ChatPage() {
         c.toLowerCase().includes(buscarCarta.toLowerCase())
       )
     : CARTAS_TAROT;
+
+  // Detectar mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useEffect(() => {
     carregarDados();
@@ -130,13 +141,6 @@ export default function ChatPage() {
       .eq("id", sessaoId)
       .single();
 
-    console.log("🔍 Verificando acesso à sessão:", {
-      sessaoData,
-      userId: user.id,
-      isUsuario: sessaoData?.usuario_id === user.id,
-      isAdmin: sessaoData?.admin_id === user.id,
-    });
-
     if (
       !sessaoData ||
       (sessaoData.usuario_id !== user.id && sessaoData.admin_id !== user.id)
@@ -168,13 +172,10 @@ export default function ChatPage() {
           filter: `sessao_id=eq.${sessaoId}`,
         },
         (payload) => {
-          console.log("💬 Nova mensagem recebida:", payload);
           setMensagens((prev) => [...prev, payload.new as Mensagem]);
         }
       )
       .subscribe();
-
-    console.log("🔧 Criando canal de cartas para sessão:", sessaoId);
 
     const canalCartas = supabase
       .channel(`cartas-${sessaoId}-${Date.now()}`)
@@ -187,7 +188,6 @@ export default function ChatPage() {
           filter: `sessao_id=eq.${sessaoId}`,
         },
         (payload) => {
-          console.log("✅ INSERT recebido:", payload);
           setCartas((prev) => [...prev, payload.new as CartaMesa]);
         }
       )
@@ -200,22 +200,12 @@ export default function ChatPage() {
           filter: `sessao_id=eq.${sessaoId}`,
         },
         (payload) => {
-          console.log("🗑️ DELETE recebido:", payload);
           setCartas((prev) =>
             prev.filter((c) => c.id !== (payload.old as any).id)
           );
         }
       )
-      .subscribe((status, err) => {
-        console.log("📡 Status do canal cartas:", status, err);
-        if (status === "SUBSCRIBED") {
-          console.log("✅ Canal de cartas CONECTADO!");
-        } else if (status === "CHANNEL_ERROR") {
-          console.error("❌ Erro no canal de cartas:", err);
-        }
-      });
-
-    console.log("🔧 Canal criado:", canalCartas);
+      .subscribe();
 
     const canalSessao = supabase
       .channel(`sess-${sessaoId}-${Date.now()}`)
@@ -228,11 +218,9 @@ export default function ChatPage() {
           filter: `id=eq.${sessaoId}`,
         },
         (payload) => {
-          console.log("🔄 UPDATE sessão recebido:", payload);
           const nova = payload.new as any;
           setSessao((prev) => (prev ? { ...prev, ...nova } : null));
           if (nova.status === "finalizada") {
-            console.log("⏰ Sessão finalizada detectada!");
             setChatAtivo(false);
             if (timerRef.current) clearInterval(timerRef.current);
             alert("⏰ Consulta finalizada!");
@@ -240,14 +228,8 @@ export default function ChatPage() {
           }
         }
       )
-      .subscribe((status, err) => {
-        console.log("📡 Status do canal sessão:", status, err);
-        if (status === "SUBSCRIBED") {
-          console.log("✅ Canal de sessão CONECTADO!");
-        } else if (status === "CHANNEL_ERROR") {
-          console.error("❌ Erro no canal de sessão:", err);
-        }
-      });
+      .subscribe();
+
     setLoading(false);
 
     return () => {
@@ -294,7 +276,6 @@ export default function ChatPage() {
   }
 
   async function finalizarSessao() {
-    console.log("🛑 Finalizando sessão...", sessaoId);
     if (timerRef.current) clearInterval(timerRef.current);
     setChatAtivo(false);
 
@@ -302,17 +283,14 @@ export default function ChatPage() {
 
     const minutosUsados = Math.ceil(tempoDecorrido / 60);
 
-    const { error, data } = await supabase
+    await supabase
       .from("sessoes")
       .update({
         status: "finalizada",
         fim: new Date().toISOString(),
         minutos_usados: minutosUsados,
       })
-      .eq("id", sessaoId)
-      .select();
-
-    console.log("🛑 Update executado:", { error, data });
+      .eq("id", sessaoId);
 
     const { data: u } = await supabase
       .from("usuarios")
@@ -322,7 +300,6 @@ export default function ChatPage() {
 
     if (u) {
       const novoSaldo = Math.max(0, u.minutos_disponiveis - minutosUsados);
-
       await supabase
         .from("usuarios")
         .update({ minutos_disponiveis: novoSaldo })
@@ -359,22 +336,9 @@ export default function ChatPage() {
   async function limparCartas() {
     if (!isAdmin || !confirm("Limpar todas as cartas?")) return;
 
-    console.log("🧹 Limpando cartas uma por uma...");
-
     for (const carta of cartas) {
-      const { error } = await supabase
-        .from("cartas_mesa")
-        .delete()
-        .eq("id", carta.id);
-
-      if (error) {
-        console.error("Erro ao deletar carta:", error);
-      } else {
-        console.log("🗑️ Carta deletada:", carta.id);
-      }
+      await supabase.from("cartas_mesa").delete().eq("id", carta.id);
     }
-
-    console.log("✅ Todas as cartas foram deletadas!");
   }
 
   async function darBonus() {
@@ -430,6 +394,439 @@ export default function ChatPage() {
     );
   }
 
+  // ========== COMPONENTE MESA (reutilizável) ==========
+  const MesaCartas = ({ mobile = false }: { mobile?: boolean }) => (
+    <div
+      style={{
+        flex: mobile ? "none" : 1,
+        height: mobile ? "180px" : "auto",
+        minWidth: 0,
+        backgroundColor: "rgba(255,255,255,0.1)",
+        backdropFilter: "blur(4px)",
+        borderRadius: "0.75rem",
+        border: "1px solid rgba(255,255,255,0.2)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          padding: "0.75rem",
+          borderBottom: "1px solid rgba(255,255,255,0.2)",
+          flexShrink: 0,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <h2
+          style={{
+            color: "white",
+            fontWeight: "bold",
+            fontSize: mobile ? "0.9rem" : "1.125rem",
+          }}
+        >
+          🎴 Mesa de Tarot
+        </h2>
+        {isAdmin && cartas.length > 0 && chatAtivo && !mobile && (
+          <button
+            onClick={limparCartas}
+            style={{
+              padding: "0.25rem 0.75rem",
+              backgroundColor: "rgb(220, 38, 38)",
+              color: "white",
+              borderRadius: "0.25rem",
+              fontSize: "0.875rem",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            Limpar
+          </button>
+        )}
+      </div>
+
+      {/* Cartas - MOBILE: scroll horizontal | DESKTOP: wrap */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowX: mobile ? "auto" : "hidden",
+          overflowY: mobile ? "hidden" : "auto",
+          padding: "0.75rem",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexWrap: mobile ? "nowrap" : "wrap",
+            gap: "0.5rem",
+          }}
+        >
+          {cartas.map((carta) => {
+            const imagemUrl = getImagemCarta(carta.nome_carta);
+
+            return (
+              <div
+                key={carta.id}
+                style={{
+                  width: mobile ? "120px" : "calc(33.333% - 0.35rem)",
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  style={{
+                    background:
+                      "linear-gradient(to bottom right, rgb(202, 138, 4), rgb(161, 98, 7))",
+                    borderRadius: "0.5rem",
+                    border: "2px solid rgb(113, 63, 18)",
+                    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                    padding: "0.5rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    position: "relative",
+                    aspectRatio: "2/3",
+                    height: mobile ? "180px" : "auto",
+                    maxHeight: mobile ? "180px" : "180px",
+                    overflow: "hidden",
+                  }}
+                >
+                  {/* Número */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "0.25rem",
+                      left: "0.25rem",
+                      backgroundColor: "rgba(0,0,0,0.8)",
+                      padding: "0.125rem 0.375rem",
+                      borderRadius: "0.25rem",
+                      color: "rgb(253, 224, 71)",
+                      fontSize: "10px",
+                      fontWeight: "bold",
+                      zIndex: 10,
+                    }}
+                  >
+                    #{carta.ordem}
+                  </div>
+
+                  {/* Imagem */}
+                  <div
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      overflow: "hidden",
+                      borderRadius: "0.25rem",
+                    }}
+                  >
+                    {imagemUrl ? (
+                      <img
+                        src={imagemUrl}
+                        alt={carta.nome_carta}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          color: "white",
+                          fontSize: "2.25rem",
+                          fontWeight: "bold",
+                          filter: "drop-shadow(0 25px 25px rgb(0 0 0 / 0.15))",
+                        }}
+                      >
+                        {getInicialCarta(carta.nome_carta)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nome */}
+                  <div
+                    style={{
+                      backgroundColor: "rgba(0,0,0,0.8)",
+                      padding: "0.25rem",
+                      borderRadius: "0.25rem",
+                      marginTop: "0.25rem",
+                    }}
+                  >
+                    <p
+                      style={{
+                        color: "white",
+                        fontWeight: "bold",
+                        textAlign: "center",
+                        fontSize: "10px",
+                        lineHeight: "1.25",
+                      }}
+                    >
+                      {carta.nome_carta}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {cartas.length === 0 && (
+          <div
+            style={{
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "rgba(255,255,255,0.4)",
+              fontSize: "0.875rem",
+            }}
+          >
+            Nenhuma carta na mesa
+          </div>
+        )}
+      </div>
+
+      {/* Footer Admin - SÓ NO DESKTOP */}
+      {isAdmin && cartas.length < 10 && chatAtivo && !mobile && (
+        <div
+          style={{
+            padding: "0.75rem",
+            borderTop: "1px solid rgba(255,255,255,0.2)",
+            flexShrink: 0,
+          }}
+        >
+          <input
+            type="text"
+            value={buscarCarta}
+            onChange={(e) => setBuscarCarta(e.target.value)}
+            placeholder="Buscar carta..."
+            style={{
+              width: "100%",
+              padding: "0.5rem 0.75rem",
+              backgroundColor: "rgba(255,255,255,0.1)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: "0.5rem",
+              color: "white",
+              fontSize: "0.875rem",
+              marginBottom: "0.5rem",
+            }}
+          />
+          {buscarCarta && cartasFiltradas.length > 0 && (
+            <div
+              style={{
+                maxHeight: "8rem",
+                overflowY: "auto",
+                backgroundColor: "rgba(15, 23, 42, 0.9)",
+                borderRadius: "0.5rem",
+                marginBottom: "0.5rem",
+              }}
+            >
+              {cartasFiltradas.slice(0, 6).map((c, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setNovaCarta(c);
+                    setBuscarCarta("");
+                  }}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "0.5rem 0.75rem",
+                    color: "white",
+                    fontSize: "0.875rem",
+                    borderBottom: "1px solid rgba(255,255,255,0.05)",
+                    backgroundColor: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+          {novaCarta && (
+            <div
+              style={{
+                marginBottom: "0.5rem",
+                padding: "0.5rem",
+                backgroundColor: "rgba(255,255,255,0.1)",
+                borderRadius: "0.25rem",
+                color: "white",
+                fontSize: "0.875rem",
+              }}
+            >
+              {novaCarta}
+            </div>
+          )}
+          <button
+            onClick={adicionarCarta}
+            disabled={!novaCarta}
+            style={{
+              width: "100%",
+              padding: "0.5rem",
+              backgroundColor: novaCarta
+                ? "rgb(147, 51, 234)"
+                : "rgb(75, 85, 99)",
+              color: "white",
+              borderRadius: "0.5rem",
+              fontSize: "0.875rem",
+              border: "none",
+              cursor: novaCarta ? "pointer" : "not-allowed",
+            }}
+          >
+            + Adicionar Carta
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  // ========== COMPONENTE CHAT (reutilizável) ==========
+  const ChatMensagens = ({ mobile = false }: { mobile?: boolean }) => (
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        minHeight: 0,
+        backgroundColor: "rgba(255,255,255,0.1)",
+        backdropFilter: "blur(4px)",
+        borderRadius: "0.75rem",
+        border: "1px solid rgba(255,255,255,0.2)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        ref={messagesContainerRef}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          padding: "0.75rem",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.5rem",
+          }}
+        >
+          {mensagens.map((msg) => {
+            const isMinha = msg.remetente_id === usuarioId;
+            return (
+              <div
+                key={msg.id}
+                style={{
+                  display: "flex",
+                  justifyContent: isMinha ? "flex-end" : "flex-start",
+                }}
+              >
+                <div
+                  style={{
+                    maxWidth: "70%",
+                    padding: "0.5rem 0.75rem",
+                    borderRadius: "0.5rem",
+                    backgroundColor: isMinha
+                      ? "rgb(147, 51, 234)"
+                      : "rgba(255,255,255,0.2)",
+                    color: "white",
+                  }}
+                >
+                  {!isMinha && (
+                    <p
+                      style={{
+                        fontSize: "0.75rem",
+                        fontWeight: "600",
+                        marginBottom: "0.25rem",
+                        color: "rgb(216, 180, 254)",
+                      }}
+                    >
+                      {getNome(msg.remetente_id)}
+                    </p>
+                  )}
+                  <p
+                    style={{
+                      wordBreak: "break-word",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    {msg.mensagem}
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "0.75rem",
+                      opacity: 0.6,
+                      marginTop: "0.25rem",
+                    }}
+                  >
+                    {new Date(msg.created_at).toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <form
+        onSubmit={enviarMensagem}
+        style={{
+          padding: "0.75rem",
+          borderTop: "1px solid rgba(255,255,255,0.2)",
+          flexShrink: 0,
+        }}
+      >
+        {chatAtivo ? (
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <input
+              type="text"
+              value={novaMensagem}
+              onChange={(e) => setNovaMensagem(e.target.value)}
+              placeholder="Digite sua mensagem..."
+              autoFocus
+              style={{
+                flex: 1,
+                padding: "0.5rem 1rem",
+                backgroundColor: "rgba(255,255,255,0.1)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: "0.5rem",
+                color: "white",
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                padding: "0.5rem 1.5rem",
+                backgroundColor: "rgb(147, 51, 234)",
+                color: "white",
+                borderRadius: "0.5rem",
+                fontWeight: "500",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              Enviar
+            </button>
+          </div>
+        ) : (
+          <div style={{ textAlign: "center", padding: "0.5rem" }}>
+            <p style={{ color: "rgb(252, 165, 165)", fontWeight: "500" }}>
+              ⏰ Consulta finalizada
+            </p>
+          </div>
+        )}
+      </form>
+    </div>
+  );
+
   return (
     <div
       style={{
@@ -461,24 +858,37 @@ export default function ChatPage() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
+            flexWrap: isMobile ? "wrap" : "nowrap",
+            gap: "0.5rem",
           }}
         >
-          <div>
+          <div style={{ flex: isMobile ? "1 1 100%" : "none" }}>
             <h1
               style={{
-                fontSize: "1.25rem",
+                fontSize: isMobile ? "1rem" : "1.25rem",
                 fontWeight: "bold",
                 color: "white",
               }}
             >
-              🔮 Consulta com{" "}
-              {isAdmin ? sessao?.usuario.nome : sessao?.tarologo.nome}
+              🔮 {isAdmin ? sessao?.usuario.nome : sessao?.tarologo.nome}
             </h1>
-            <p style={{ fontSize: "0.875rem", color: "rgb(216, 180, 254)" }}>
-              {isAdmin ? "Você está atendendo" : "Seu tarólogo"}
+            <p
+              style={{
+                fontSize: "0.75rem",
+                color: "rgb(216, 180, 254)",
+              }}
+            >
+              {isAdmin ? "Cliente" : "Seu tarólogo"}
             </p>
           </div>
-          <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: isMobile ? "0.5rem" : "1rem",
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
             {sessao && (
               <TimerMistico
                 tempoDecorrido={tempoDecorrido}
@@ -491,36 +901,37 @@ export default function ChatPage() {
               <button
                 onClick={darBonus}
                 style={{
-                  padding: "0.5rem 1rem",
+                  padding: isMobile ? "0.4rem 0.8rem" : "0.5rem 1rem",
                   backgroundColor: "rgb(147, 51, 234)",
                   color: "white",
                   borderRadius: "0.5rem",
                   border: "none",
                   cursor: "pointer",
+                  fontSize: isMobile ? "0.75rem" : "0.875rem",
                 }}
               >
-                🎁 Dar +5min
+                🎁 +5min
               </button>
             )}
 
             {isAdmin && chatAtivo && (
               <button
                 onClick={async () => {
-                  if (confirm("Tem certeza que deseja finalizar a consulta?")) {
+                  if (confirm("Finalizar consulta?")) {
                     await finalizarSessao();
                   }
                 }}
                 style={{
-                  padding: "0.5rem 1rem",
+                  padding: isMobile ? "0.4rem 0.8rem" : "0.5rem 1rem",
                   backgroundColor: "rgb(220, 38, 38)",
                   color: "white",
                   borderRadius: "0.5rem",
                   border: "none",
                   cursor: "pointer",
-                  fontSize: "0.875rem",
+                  fontSize: isMobile ? "0.75rem" : "0.875rem",
                 }}
               >
-                ⏹️ Finalizar
+                ⏹️
               </button>
             )}
 
@@ -529,30 +940,30 @@ export default function ChatPage() {
                 onClick={async () => {
                   if (
                     confirm(
-                      "Tem certeza que deseja encerrar a consulta? Você será cobrado pelo tempo usado."
+                      "Encerrar consulta? Você será cobrado pelo tempo usado."
                     )
                   ) {
                     await finalizarSessao();
                   }
                 }}
                 style={{
-                  padding: "0.5rem 1rem",
+                  padding: isMobile ? "0.4rem 0.8rem" : "0.5rem 1rem",
                   backgroundColor: "rgb(220, 38, 38)",
                   color: "white",
                   borderRadius: "0.5rem",
                   border: "none",
                   cursor: "pointer",
-                  fontSize: "0.875rem",
+                  fontSize: isMobile ? "0.75rem" : "0.875rem",
                 }}
               >
-                ❌ Encerrar
+                ❌
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Conteúdo */}
+      {/* Conteúdo - RESPONSIVO */}
       <div style={{ flex: 1, minHeight: 0, padding: "1rem" }}>
         <div
           style={{
@@ -560,432 +971,18 @@ export default function ChatPage() {
             maxWidth: "1280px",
             margin: "0 auto",
             display: "flex",
+            flexDirection: isMobile ? "column" : "row",
             gap: "1rem",
           }}
         >
-          {/* Mesa */}
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-              backgroundColor: "rgba(255,255,255,0.1)",
-              backdropFilter: "blur(4px)",
-              borderRadius: "0.75rem",
-              border: "1px solid rgba(255,255,255,0.2)",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                padding: "0.75rem",
-                borderBottom: "1px solid rgba(255,255,255,0.2)",
-                flexShrink: 0,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <h2
-                style={{
-                  color: "white",
-                  fontWeight: "bold",
-                  fontSize: "1.125rem",
-                }}
-              >
-                🎴 Mesa de Tarot
-              </h2>
-              {isAdmin && cartas.length > 0 && chatAtivo && (
-                <button
-                  onClick={limparCartas}
-                  style={{
-                    padding: "0.25rem 0.75rem",
-                    backgroundColor: "rgb(220, 38, 38)",
-                    color: "white",
-                    borderRadius: "0.25rem",
-                    fontSize: "0.875rem",
-                    border: "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  Limpar
-                </button>
-              )}
-            </div>
+          {/* MOBILE: Mesa horizontal no topo */}
+          {isMobile && <MesaCartas mobile={true} />}
 
-            {/* ============ CARTAS COM IMAGENS - INÍCIO ============ */}
-            <div
-              style={{
-                flex: 1,
-                minHeight: 0,
-                overflowY: "auto",
-                padding: "0.75rem",
-              }}
-            >
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                {cartas.map((carta) => {
-                  // BUSCAR URL DA IMAGEM
-                  const imagemUrl = getImagemCarta(carta.nome_carta);
+          {/* DESKTOP: Mesa 50% */}
+          {!isMobile && <MesaCartas mobile={false} />}
 
-                  return (
-                    <div
-                      key={carta.id}
-                      style={{ width: "calc(33.333% - 0.35rem)" }}
-                    >
-                      <div
-                        style={{
-                          background:
-                            "linear-gradient(to bottom right, rgb(202, 138, 4), rgb(161, 98, 7))",
-                          borderRadius: "0.5rem",
-                          border: "2px solid rgb(113, 63, 18)",
-                          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                          padding: "0.5rem",
-                          display: "flex",
-                          flexDirection: "column",
-                          position: "relative",
-                          aspectRatio: "2/3",
-                          maxHeight: "180px",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {/* Número da ordem */}
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: "0.25rem",
-                            left: "0.25rem",
-                            backgroundColor: "rgba(0,0,0,0.8)",
-                            padding: "0.125rem 0.375rem",
-                            borderRadius: "0.25rem",
-                            color: "rgb(253, 224, 71)",
-                            fontSize: "10px",
-                            fontWeight: "bold",
-                            zIndex: 10,
-                          }}
-                        >
-                          #{carta.ordem}
-                        </div>
-
-                        {/* IMAGEM DA CARTA OU FALLBACK */}
-                        <div
-                          style={{
-                            flex: 1,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            overflow: "hidden",
-                            borderRadius: "0.25rem",
-                          }}
-                        >
-                          {imagemUrl ? (
-                            <img
-                              src={imagemUrl}
-                              alt={carta.nome_carta}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                              }}
-                              onError={(e) => {
-                                console.error(
-                                  `Erro ao carregar imagem: ${carta.nome_carta}`
-                                );
-                                // Esconder imagem e mostrar fallback
-                                e.currentTarget.style.display = "none";
-                              }}
-                            />
-                          ) : (
-                            // Fallback: letra inicial
-                            <div
-                              style={{
-                                color: "white",
-                                fontSize: "2.25rem",
-                                fontWeight: "bold",
-                                filter:
-                                  "drop-shadow(0 25px 25px rgb(0 0 0 / 0.15))",
-                              }}
-                            >
-                              {getInicialCarta(carta.nome_carta)}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Nome da carta */}
-                        <div
-                          style={{
-                            backgroundColor: "rgba(0,0,0,0.8)",
-                            padding: "0.25rem",
-                            borderRadius: "0.25rem",
-                            marginTop: "0.25rem",
-                          }}
-                        >
-                          <p
-                            style={{
-                              color: "white",
-                              fontWeight: "bold",
-                              textAlign: "center",
-                              fontSize: "10px",
-                              lineHeight: "1.25",
-                            }}
-                          >
-                            {carta.nome_carta}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {cartas.length === 0 && (
-                <div
-                  style={{
-                    height: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "rgba(255,255,255,0.4)",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  Nenhuma carta na mesa
-                </div>
-              )}
-            </div>
-            {/* ============ CARTAS COM IMAGENS - FIM ============ */}
-
-            {/* Footer */}
-            {isAdmin && cartas.length < 10 && chatAtivo && (
-              <div
-                style={{
-                  padding: "0.75rem",
-                  borderTop: "1px solid rgba(255,255,255,0.2)",
-                  flexShrink: 0,
-                }}
-              >
-                <input
-                  type="text"
-                  value={buscarCarta}
-                  onChange={(e) => setBuscarCarta(e.target.value)}
-                  placeholder="Buscar carta..."
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem 0.75rem",
-                    backgroundColor: "rgba(255,255,255,0.1)",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    borderRadius: "0.5rem",
-                    color: "white",
-                    fontSize: "0.875rem",
-                    marginBottom: "0.5rem",
-                  }}
-                />
-                {buscarCarta && cartasFiltradas.length > 0 && (
-                  <div
-                    style={{
-                      maxHeight: "8rem",
-                      overflowY: "auto",
-                      backgroundColor: "rgba(15, 23, 42, 0.9)",
-                      borderRadius: "0.5rem",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    {cartasFiltradas.slice(0, 6).map((c, i) => (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          setNovaCarta(c);
-                          setBuscarCarta("");
-                        }}
-                        style={{
-                          width: "100%",
-                          textAlign: "left",
-                          padding: "0.5rem 0.75rem",
-                          color: "white",
-                          fontSize: "0.875rem",
-                          borderBottom: "1px solid rgba(255,255,255,0.05)",
-                          backgroundColor: "transparent",
-                          border: "none",
-                          cursor: "pointer",
-                        }}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {novaCarta && (
-                  <div
-                    style={{
-                      marginBottom: "0.5rem",
-                      padding: "0.5rem",
-                      backgroundColor: "rgba(255,255,255,0.1)",
-                      borderRadius: "0.25rem",
-                      color: "white",
-                      fontSize: "0.875rem",
-                    }}
-                  >
-                    {novaCarta}
-                  </div>
-                )}
-                <button
-                  onClick={adicionarCarta}
-                  disabled={!novaCarta}
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem",
-                    backgroundColor: novaCarta
-                      ? "rgb(147, 51, 234)"
-                      : "rgb(75, 85, 99)",
-                    color: "white",
-                    borderRadius: "0.5rem",
-                    fontSize: "0.875rem",
-                    border: "none",
-                    cursor: novaCarta ? "pointer" : "not-allowed",
-                  }}
-                >
-                  + Adicionar Carta
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Chat */}
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-              backgroundColor: "rgba(255,255,255,0.1)",
-              backdropFilter: "blur(4px)",
-              borderRadius: "0.75rem",
-              border: "1px solid rgba(255,255,255,0.2)",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              ref={messagesContainerRef}
-              style={{
-                flex: 1,
-                minHeight: 0,
-                overflowY: "auto",
-                padding: "0.75rem",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.5rem",
-                }}
-              >
-                {mensagens.map((msg) => {
-                  const isMinha = msg.remetente_id === usuarioId;
-                  return (
-                    <div
-                      key={msg.id}
-                      style={{
-                        display: "flex",
-                        justifyContent: isMinha ? "flex-end" : "flex-start",
-                      }}
-                    >
-                      <div
-                        style={{
-                          maxWidth: "70%",
-                          padding: "0.5rem 0.75rem",
-                          borderRadius: "0.5rem",
-                          backgroundColor: isMinha
-                            ? "rgb(147, 51, 234)"
-                            : "rgba(255,255,255,0.2)",
-                          color: "white",
-                        }}
-                      >
-                        {!isMinha && (
-                          <p
-                            style={{
-                              fontSize: "0.75rem",
-                              fontWeight: "600",
-                              marginBottom: "0.25rem",
-                              color: "rgb(216, 180, 254)",
-                            }}
-                          >
-                            {getNome(msg.remetente_id)}
-                          </p>
-                        )}
-                        <p
-                          style={{
-                            wordBreak: "break-word",
-                            fontSize: "0.875rem",
-                          }}
-                        >
-                          {msg.mensagem}
-                        </p>
-                        <p
-                          style={{
-                            fontSize: "0.75rem",
-                            opacity: 0.6,
-                            marginTop: "0.25rem",
-                          }}
-                        >
-                          {new Date(msg.created_at).toLocaleTimeString(
-                            "pt-BR",
-                            { hour: "2-digit", minute: "2-digit" }
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <form
-              onSubmit={enviarMensagem}
-              style={{
-                padding: "0.75rem",
-                borderTop: "1px solid rgba(255,255,255,0.2)",
-                flexShrink: 0,
-              }}
-            >
-              {chatAtivo ? (
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <input
-                    type="text"
-                    value={novaMensagem}
-                    onChange={(e) => setNovaMensagem(e.target.value)}
-                    placeholder="Digite sua mensagem..."
-                    autoFocus
-                    style={{
-                      flex: 1,
-                      padding: "0.5rem 1rem",
-                      backgroundColor: "rgba(255,255,255,0.1)",
-                      border: "1px solid rgba(255,255,255,0.2)",
-                      borderRadius: "0.5rem",
-                      color: "white",
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    style={{
-                      padding: "0.5rem 1.5rem",
-                      backgroundColor: "rgb(147, 51, 234)",
-                      color: "white",
-                      borderRadius: "0.5rem",
-                      fontWeight: "500",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Enviar
-                  </button>
-                </div>
-              ) : (
-                <div style={{ textAlign: "center", padding: "0.5rem" }}>
-                  <p style={{ color: "rgb(252, 165, 165)", fontWeight: "500" }}>
-                    ⏰ Consulta finalizada
-                  </p>
-                </div>
-              )}
-            </form>
-          </div>
+          {/* Chat (mobile e desktop) */}
+          <ChatMensagens mobile={isMobile} />
         </div>
       </div>
     </div>
