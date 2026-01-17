@@ -109,15 +109,20 @@ export default function ChatPage() {
 
   // CORRIGIDO: Scroll sempre pro FINAL (não pro topo!)
   useEffect(() => {
-    if (messagesContainerRef.current) {
-      const container = messagesContainerRef.current;
-      // Esperar 2 frames para garantir render
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          container.scrollTop = container.scrollHeight;
-        });
-      });
-    }
+    const scrollToBottom = () => {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop =
+          messagesContainerRef.current.scrollHeight;
+      }
+    };
+
+    // Scroll imediato
+    scrollToBottom();
+
+    // Scroll com delay (garante render)
+    const timeout = setTimeout(scrollToBottom, 50);
+
+    return () => clearTimeout(timeout);
   }, [mensagens]);
 
   async function carregarDados() {
@@ -353,6 +358,14 @@ export default function ChatPage() {
       mensagem: novaMensagem.trim(),
     });
     setNovaMensagem("");
+
+    // Forçar scroll após enviar
+    setTimeout(() => {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop =
+          messagesContainerRef.current.scrollHeight;
+      }
+    }, 100);
   }
 
   async function adicionarCarta(e: React.FormEvent) {
@@ -519,8 +532,8 @@ export default function ChatPage() {
                     flexDirection: "column",
                     position: "relative",
                     aspectRatio: "2/3",
-                    height: mobile ? "210px" : "auto", // AUMENTADO
-                    maxHeight: mobile ? "203px" : "180px",
+                    height: mobile ? "215px" : "auto",
+                    maxHeight: mobile ? "215px" : "180px", // MESMO valor!
                     overflow: "hidden",
                   }}
                 >
@@ -584,7 +597,7 @@ export default function ChatPage() {
                   <div
                     style={{
                       backgroundColor: "rgba(0,0,0,0.9)",
-                      padding: "0.4rem 0.3rem", // AUMENTADO vertical
+                      padding: "0.5rem 0.4rem", // Mais espaço vertical
                       borderRadius: "0.25rem",
                       flexShrink: 0,
                       minHeight: "24px", // ADICIONADO - garante espaço mínimo
