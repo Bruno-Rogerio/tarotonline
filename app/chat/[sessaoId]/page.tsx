@@ -108,22 +108,6 @@ export default function ChatPage() {
   }, [sessao]);
 
   // CORRIGIDO: Scroll sempre pro FINAL (não pro topo!)
-  useEffect(() => {
-    const scrollToBottom = () => {
-      if (messagesContainerRef.current) {
-        messagesContainerRef.current.scrollTop =
-          messagesContainerRef.current.scrollHeight;
-      }
-    };
-
-    // Scroll imediato
-    scrollToBottom();
-
-    // Scroll com delay (garante render)
-    const timeout = setTimeout(scrollToBottom, 50);
-
-    return () => clearTimeout(timeout);
-  }, [mensagens]);
 
   async function carregarDados() {
     const {
@@ -358,14 +342,6 @@ export default function ChatPage() {
       mensagem: novaMensagem.trim(),
     });
     setNovaMensagem("");
-
-    // Forçar scroll após enviar
-    setTimeout(() => {
-      if (messagesContainerRef.current) {
-        messagesContainerRef.current.scrollTop =
-          messagesContainerRef.current.scrollHeight;
-      }
-    }, 100);
   }
 
   async function adicionarCarta(e: React.FormEvent) {
@@ -532,7 +508,6 @@ export default function ChatPage() {
                     flexDirection: "column",
                     position: "relative",
                     aspectRatio: "2/3",
-                    height: mobile ? "215px" : "auto",
                     maxHeight: mobile ? "215px" : "180px", // MESMO valor!
                     overflow: "hidden",
                   }}
@@ -822,6 +797,7 @@ export default function ChatPage() {
               </div>
             );
           })}
+          <div ref={(el) => el?.scrollIntoView({ behavior: "smooth" })} />
         </div>
       </div>
 
