@@ -107,7 +107,14 @@ export default function ChatPage() {
     if (sessao?.status === "em_andamento") iniciarTimer();
   }, [sessao]);
 
-  // CORRIGIDO: Scroll sempre pro FINAL (não pro topo!)
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [mensagens]);
 
   async function carregarDados() {
     const {
@@ -797,7 +804,6 @@ export default function ChatPage() {
               </div>
             );
           })}
-          <div ref={(el) => el?.scrollIntoView({ behavior: "smooth" })} />
         </div>
       </div>
 
