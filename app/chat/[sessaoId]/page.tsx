@@ -750,8 +750,8 @@ export default function ChatPage() {
           minHeight: 0,
           overflowY: "auto",
           padding: "0.75rem",
-          display: "flex",
-          flexDirection: "column", // IMPORTANTE
+          //display: "flex",
+          //flexDirection: "column", // IMPORTANTE
         }}
       >
         <div
@@ -759,6 +759,7 @@ export default function ChatPage() {
             display: "flex",
             flexDirection: "column",
             gap: "0.5rem",
+            minHeight: "100%",
           }}
         >
           {mensagens.map((msg) => {
