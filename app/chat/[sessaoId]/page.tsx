@@ -111,22 +111,14 @@ export default function ChatPage() {
     if (messagesContainerRef.current && mensagens.length > 0) {
       const container = messagesContainerRef.current;
 
-      // Usar requestAnimationFrame para garantir que o DOM atualizou
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const targetScroll = container.scrollHeight - container.clientHeight;
+      const timeoutId = setTimeout(() => {
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+          console.log("✅ Scrolled:", container.scrollTop);
+        }
+      }, 100);
 
-          console.log("📊 Debug scroll:", {
-            scrollHeight: container.scrollHeight,
-            clientHeight: container.clientHeight,
-            targetScroll: targetScroll,
-            currentScroll: container.scrollTop,
-            mensagensCount: mensagens.length,
-          });
-
-          container.scrollTop = targetScroll;
-        });
-      });
+      return () => clearTimeout(timeoutId);
     }
   }, [mensagens]);
 
@@ -750,8 +742,8 @@ export default function ChatPage() {
           minHeight: 0,
           overflowY: "auto",
           padding: "0.75rem",
-          //display: "flex",
-          //flexDirection: "column", // IMPORTANTE
+          display: "flex",
+          flexDirection: "column", // IMPORTANTE
         }}
       >
         <div
