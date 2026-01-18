@@ -108,10 +108,24 @@ export default function ChatPage() {
   }, [sessao]);
 
   useEffect(() => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTo({
-        top: messagesContainerRef.current.scrollHeight,
-        behavior: "smooth",
+    if (messagesContainerRef.current && mensagens.length > 0) {
+      const container = messagesContainerRef.current;
+
+      // Usar requestAnimationFrame para garantir que o DOM atualizou
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const targetScroll = container.scrollHeight - container.clientHeight;
+
+          console.log("📊 Debug scroll:", {
+            scrollHeight: container.scrollHeight,
+            clientHeight: container.clientHeight,
+            targetScroll: targetScroll,
+            currentScroll: container.scrollTop,
+            mensagensCount: mensagens.length,
+          });
+
+          container.scrollTop = targetScroll;
+        });
       });
     }
   }, [mensagens]);
