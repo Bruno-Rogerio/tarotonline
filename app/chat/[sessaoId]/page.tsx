@@ -108,11 +108,37 @@ export default function ChatPage() {
     if (sessao?.status === "em_andamento") iniciarTimer();
   }, [sessao]);
 
-  // CORREÇÃO: Scroll automático usando scrollIntoView
+  // Debug: listener para monitorar eventos de scroll
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (container) {
+      const handleScroll = () => {
+        console.log("📜 SCROLL EVENT - scrollTop:", container.scrollTop);
+      };
+      container.addEventListener("scroll", handleScroll);
+      return () => container.removeEventListener("scroll", handleScroll);
+    }
+  }, []);
+
+  // Scroll automático quando mensagens mudam
   useEffect(() => {
     console.log("🔄 useEffect scroll disparou, mensagens:", mensagens.length);
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "auto" });
+
+    if (messagesContainerRef.current) {
+      console.log(
+        "ANTES - scrollTop:",
+        messagesContainerRef.current.scrollTop,
+        "scrollHeight:",
+        messagesContainerRef.current.scrollHeight
+      );
+
+      messagesContainerRef.current.scrollTop =
+        messagesContainerRef.current.scrollHeight;
+
+      console.log(
+        "DEPOIS - scrollTop:",
+        messagesContainerRef.current.scrollTop
+      );
     }
   }, [mensagens]);
 
