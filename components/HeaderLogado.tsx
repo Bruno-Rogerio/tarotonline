@@ -90,7 +90,7 @@ export default function HeaderLogado({ usuario }: { usuario: Usuario }) {
                 className="w-10 h-10 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300"
               />
               <span className="text-2xl font-bold bg-gradient-to-r from-purple-300 via-pink-300 to-purple-300 bg-clip-text text-transparent group-hover:from-pink-300 group-hover:to-purple-300 transition-all">
-                Tarot Místico
+                Viaa Tarot
               </span>
             </Link>
 
