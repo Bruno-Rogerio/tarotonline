@@ -107,27 +107,17 @@ export default function ChatPage() {
     if (sessao?.status === "em_andamento") iniciarTimer();
   }, [sessao]);
 
+  // Scroll automático quando mensagens mudam
   useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container || mensagens.length === 0) return;
+    const scrollToBottom = () => {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop =
+          messagesContainerRef.current.scrollHeight;
+      }
+    };
 
-    // Criar observer para detectar quando o DOM muda
-    const observer = new MutationObserver(() => {
-      // Fazer scroll quando o conteúdo mudar
-      container.scrollTop = container.scrollHeight;
-    });
-
-    // Observar mudanças no container
-    observer.observe(container, {
-      childList: true,
-      subtree: true,
-    });
-
-    // Scroll inicial imediato
-    container.scrollTop = container.scrollHeight;
-
-    // Cleanup
-    return () => observer.disconnect();
+    // requestAnimationFrame garante que executa após o paint do browser
+    requestAnimationFrame(scrollToBottom);
   }, [mensagens]);
 
   async function carregarDados() {
