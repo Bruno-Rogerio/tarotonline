@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import TarologoCard from "./TarologoCard";
 import HeaderLogado from "./HeaderLogado";
 import Link from "next/link";
+import RegistrarAcesso from "./RegistrarAcesso";
 
 type Tarologo = {
   id: string;
@@ -326,7 +327,7 @@ export default function HomeContent({
   // Loading state com animação
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-950 via-indigo-950 to-purple-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-950 via-indigo-950 to-purp  return (le-900 flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4 animate-pulse">🔮</div>
           <div className="text-white/80 text-lg">Carregando...</div>
@@ -337,6 +338,8 @@ export default function HomeContent({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-950 via-indigo-950 to-purple-900">
+      {/* Registrar acessos */}
+      <RegistrarAcesso />
       {/* Header */}
       {usuario ? (
         <HeaderLogado usuario={usuario} />
