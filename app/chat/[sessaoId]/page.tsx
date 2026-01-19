@@ -108,18 +108,26 @@ export default function ChatPage() {
   }, [sessao]);
 
   useEffect(() => {
-    if (messagesContainerRef.current && mensagens.length > 0) {
-      const container = messagesContainerRef.current;
+    const container = messagesContainerRef.current;
+    if (!container || mensagens.length === 0) return;
 
-      const timeoutId = setTimeout(() => {
-        if (container) {
-          container.scrollTop = container.scrollHeight;
-          console.log("✅ Scrolled:", container.scrollTop);
-        }
-      }, 100);
+    // Criar observer para detectar quando o DOM muda
+    const observer = new MutationObserver(() => {
+      // Fazer scroll quando o conteúdo mudar
+      container.scrollTop = container.scrollHeight;
+    });
 
-      return () => clearTimeout(timeoutId);
-    }
+    // Observar mudanças no container
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+    });
+
+    // Scroll inicial imediato
+    container.scrollTop = container.scrollHeight;
+
+    // Cleanup
+    return () => observer.disconnect();
   }, [mensagens]);
 
   async function carregarDados() {
