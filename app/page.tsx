@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import HomeContent from "@/components/HomeContent";
 
+export const dynamic = "force-dynamic";
+
 async function getTarologos() {
   const { data, error } = await supabase
     .from("tarologos")
