@@ -326,15 +326,15 @@ export default function HomeContent({
             {/* Botões */}
             <div className="flex items-center gap-2 md:gap-3">
               <Link
+                href="/sobre"
+                className="px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base text-purple-300 hover:text-white hover:bg-white/10 rounded-full transition-all"
+              >
+                Sobre
+              </Link>
+              <Link
                 href="/login"
                 className="px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base text-purple-300 hover:text-white hover:bg-white/10 rounded-full transition-all"
               >
-                <Link
-                  href="/sobre"
-                  className="px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base text-purple-300 hover:text-white hover:bg-white/10 rounded-full transition-all"
-                >
-                  Sobre
-                </Link>
                 Entrar
               </Link>
               <Link
@@ -594,16 +594,16 @@ export default function HomeContent({
 
             {/* Links */}
             <div className="flex items-center gap-6 text-sm">
+              <Link
+                href="/sobre"
+                className="text-purple-300/70 hover:text-white transition-colors"
+              >
+                Sobre
+              </Link>
               <a
                 href="#"
                 className="text-purple-300/70 hover:text-white transition-colors"
               >
-                <Link
-                  href="/sobre"
-                  className="text-purple-300/70 hover:text-white transition-colors"
-                >
-                  Sobre
-                </Link>
                 Termos
               </a>
               <a
