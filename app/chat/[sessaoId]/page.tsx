@@ -110,6 +110,7 @@ export default function ChatPage() {
 
   // CORREÇÃO: Scroll automático usando scrollIntoView
   useEffect(() => {
+    console.log("🔄 useEffect scroll disparou, mensagens:", mensagens.length);
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "auto" });
     }
