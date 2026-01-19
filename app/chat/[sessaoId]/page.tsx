@@ -370,14 +370,14 @@ export default function ChatPage() {
     const { data: tarologoData } = await supabase
       .from("tarologos")
       .select("total_consultas")
-      .eq("id", sessao.tarologo)
+      .eq("id", sessao.tarologo_id)
       .single();
 
     if (tarologoData) {
       await supabase
         .from("tarologos")
         .update({ total_consultas: (tarologoData.total_consultas || 0) + 1 })
-        .eq("id", sessao.tarologo);
+        .eq("id", sessao.tarologo_id);
     }
 
     alert(`⏰ Consulta finalizada! Tempo usado: ${minutosUsados} minutos`);

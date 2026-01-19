@@ -16,17 +16,22 @@ export default function RegistrarAcesso() {
 
         // Busca localização pelo IP
         const response = await fetch(
-          "http://ip-api.com/json/?fields=status,city,regionName,query"
+          "https://ip-api.com/json/?fields=status,city,regionName,query"
         );
         const data = await response.json();
 
         if (data.status === "success") {
-          await supabase.from("acessos").insert({
-            pagina: pathname,
-            estado: data.regionName || "Desconhecido",
-            cidade: data.city || "Desconhecida",
-            ip: data.query,
-          });
+          await supabase
+            .from("acessos")
+            .insert({
+              pagina: pathname,
+              estado: data.regionName || "Desconhecido",
+              cidade: data.city || "Desconhecida",
+              ip: data.query,
+            })
+            .then(({ data, error }) => {
+              console.log("Supabase insert:", { data, error });
+            });
 
           // Marca que já registrou nesta sessão
           sessionStorage.setItem(sessionKey, "true");
