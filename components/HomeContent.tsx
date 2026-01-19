@@ -376,7 +376,7 @@ export default function HomeContent({
 
           {/* Subtítulo */}
           <p className="text-purple-200/80 text-base md:text-xl max-w-2xl mx-auto mb-8 md:mb-10 px-4">
-            A Viaa Tarot conecta você a tarólogos experientes , oferecendo
+            A Viaa Tarot conecta você a tarólogos experientes, oferecendo
             consultas individuais, claras e personalizadas, com privacidade e
             transparência, no momento em que você precisar.
           </p>

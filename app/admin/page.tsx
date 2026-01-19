@@ -51,6 +51,13 @@ type Estatisticas = {
   usuariosAtivos: number;
 };
 
+type EstatisticasAcesso = {
+  acessosHoje: number;
+  acessosSemana: number;
+  acessosTotal: number;
+  estadosMaisAcessam: { estado: string; total: number }[];
+};
+
 export default function AdminPage() {
   const [abaAtiva, setAbaAtiva] = useState<
     "dashboard" | "consultas" | "pagamentos" | "usuarios"
@@ -70,6 +77,13 @@ export default function AdminPage() {
     receitaMes: 0,
     usuariosAtivos: 0,
   });
+  const [estatisticasAcesso, setEstatisticasAcesso] =
+    useState<EstatisticasAcesso>({
+      acessosHoje: 0,
+      acessosSemana: 0,
+      acessosTotal: 0,
+      estadosMaisAcessam: [],
+    });
   const [adminId, setAdminId] = useState("");
   const [loading, setLoading] = useState(true);
   const [modalCreditos, setModalCreditos] = useState<Usuario | null>(null);
@@ -94,7 +108,6 @@ export default function AdminPage() {
     }
   }, [busca, usuarios]);
 
-  // Atualizar título da página com contadores
   useEffect(() => {
     const total = sessoesPendentes.length + comprasPendentes.length;
     if (total > 0) {
@@ -129,7 +142,6 @@ export default function AdminPage() {
     setAdminId(user.id);
     await carregarDados();
 
-    // Realtime para novas solicitações
     const channel = supabase
       .channel("admin-updates")
       .on(
@@ -176,7 +188,58 @@ export default function AdminPage() {
       carregarSessoesPendentes(),
       carregarEstatisticas(),
       carregarUsuarios(),
+      carregarEstatisticasAcesso(),
     ]);
+  }
+
+  async function carregarEstatisticasAcesso() {
+    try {
+      // Acessos hoje
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const { count: acessosHoje } = await supabase
+        .from("acessos")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", hoje.toISOString());
+
+      // Acessos última semana
+      const semanaAtras = new Date();
+      semanaAtras.setDate(semanaAtras.getDate() - 7);
+      const { count: acessosSemana } = await supabase
+        .from("acessos")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", semanaAtras.toISOString());
+
+      // Acessos total
+      const { count: acessosTotal } = await supabase
+        .from("acessos")
+        .select("*", { count: "exact", head: true });
+
+      // Estados que mais acessam
+      const { data: acessosPorEstado } = await supabase
+        .from("acessos")
+        .select("estado");
+
+      const contagem: Record<string, number> = {};
+      acessosPorEstado?.forEach((acesso) => {
+        const estado = acesso.estado || "Desconhecido";
+        contagem[estado] = (contagem[estado] || 0) + 1;
+      });
+
+      const estadosMaisAcessam = Object.entries(contagem)
+        .map(([estado, total]) => ({ estado, total }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+
+      setEstatisticasAcesso({
+        acessosHoje: acessosHoje || 0,
+        acessosSemana: acessosSemana || 0,
+        acessosTotal: acessosTotal || 0,
+        estadosMaisAcessam,
+      });
+    } catch (error) {
+      console.error("Erro ao carregar estatísticas de acesso:", error);
+    }
   }
 
   async function carregarEstatisticas() {
@@ -424,7 +487,6 @@ export default function AdminPage() {
       <header className="bg-black/30 backdrop-blur-md border-b border-purple-500/20 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            {/* Logo */}
             <Link href="/" className="flex items-center gap-2">
               <span className="text-2xl">🔮</span>
               <span className="text-lg font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent hidden sm:inline">
@@ -440,7 +502,6 @@ export default function AdminPage() {
               )}
             </Link>
 
-            {/* Ações */}
             <div className="flex items-center gap-2 md:gap-4">
               <Link
                 href="/"
@@ -546,54 +607,145 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* Cards de estatísticas */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
-                <div className="text-3xl mb-2">👥</div>
-                <div className="text-2xl font-bold text-white">
-                  {estatisticas.totalUsuarios}
+            {/* Cards de ACESSOS */}
+            <div>
+              <h3 className="text-white/80 font-medium mb-3 flex items-center gap-2">
+                <span>👁️</span> Acessos ao Site
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-gradient-to-br from-cyan-500/20 to-blue-500/20 backdrop-blur-sm rounded-2xl p-4 border border-cyan-500/30">
+                  <div className="text-3xl mb-2">📈</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticasAcesso.acessosHoje}
+                  </div>
+                  <div className="text-white/60 text-sm">Acessos hoje</div>
                 </div>
-                <div className="text-white/60 text-sm">Total usuários</div>
-              </div>
 
-              <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-sm rounded-2xl p-4 border border-green-500/30">
-                <div className="text-3xl mb-2">✅</div>
-                <div className="text-2xl font-bold text-white">
-                  {estatisticas.usuariosAtivos}
+                <div className="bg-gradient-to-br from-teal-500/20 to-cyan-500/20 backdrop-blur-sm rounded-2xl p-4 border border-teal-500/30">
+                  <div className="text-3xl mb-2">📊</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticasAcesso.acessosSemana}
+                  </div>
+                  <div className="text-white/60 text-sm">Última semana</div>
                 </div>
-                <div className="text-white/60 text-sm">Com créditos</div>
-              </div>
 
-              <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-sm rounded-2xl p-4 border border-blue-500/30">
-                <div className="text-3xl mb-2">🔮</div>
-                <div className="text-2xl font-bold text-white">
-                  {estatisticas.totalConsultas}
+                <div className="bg-gradient-to-br from-sky-500/20 to-indigo-500/20 backdrop-blur-sm rounded-2xl p-4 border border-sky-500/30">
+                  <div className="text-3xl mb-2">🌐</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticasAcesso.acessosTotal}
+                  </div>
+                  <div className="text-white/60 text-sm">Total de acessos</div>
                 </div>
-                <div className="text-white/60 text-sm">Total consultas</div>
-              </div>
 
-              <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 backdrop-blur-sm rounded-2xl p-4 border border-yellow-500/30">
-                <div className="text-3xl mb-2">📅</div>
-                <div className="text-2xl font-bold text-white">
-                  {estatisticas.consultasHoje}
+                {/* Top estado */}
+                <div className="bg-gradient-to-br from-violet-500/20 to-purple-500/20 backdrop-blur-sm rounded-2xl p-4 border border-violet-500/30">
+                  <div className="text-3xl mb-2">📍</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticasAcesso.estadosMaisAcessam[0]?.estado || "-"}
+                  </div>
+                  <div className="text-white/60 text-sm">
+                    Estado que mais acessa
+                  </div>
                 </div>
-                <div className="text-white/60 text-sm">Consultas hoje</div>
               </div>
+            </div>
 
-              <div className="bg-gradient-to-br from-pink-500/20 to-rose-500/20 backdrop-blur-sm rounded-2xl p-4 border border-pink-500/30">
-                <div className="text-3xl mb-2">💰</div>
-                <div className="text-2xl font-bold text-white">
-                  R$ {estatisticas.receitaMes.toFixed(0)}
+            {/* Top 5 Estados */}
+            {estatisticasAcesso.estadosMaisAcessam.length > 0 && (
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                  <span>🗺️</span> Top 5 Estados
+                </h3>
+                <div className="space-y-3">
+                  {estatisticasAcesso.estadosMaisAcessam.map((item, index) => {
+                    const porcentagem =
+                      estatisticasAcesso.acessosTotal > 0
+                        ? (item.total / estatisticasAcesso.acessosTotal) * 100
+                        : 0;
+                    return (
+                      <div
+                        key={item.estado}
+                        className="flex items-center gap-3"
+                      >
+                        <span className="text-white/60 text-sm w-6">
+                          {index + 1}º
+                        </span>
+                        <div className="flex-1">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-white font-medium">
+                              {item.estado}
+                            </span>
+                            <span className="text-white/60 text-sm">
+                              {item.total} acessos
+                            </span>
+                          </div>
+                          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
+                              style={{ width: `${porcentagem}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="text-white/60 text-sm">Receita mês</div>
               </div>
+            )}
 
-              <div className="bg-gradient-to-br from-indigo-500/20 to-violet-500/20 backdrop-blur-sm rounded-2xl p-4 border border-indigo-500/30">
-                <div className="text-3xl mb-2">💎</div>
-                <div className="text-2xl font-bold text-white">
-                  R$ {estatisticas.receitaTotal.toFixed(0)}
+            {/* Cards de estatísticas do negócio */}
+            <div>
+              <h3 className="text-white/80 font-medium mb-3 flex items-center gap-2">
+                <span>💼</span> Estatísticas do Negócio
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
+                  <div className="text-3xl mb-2">👥</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticas.totalUsuarios}
+                  </div>
+                  <div className="text-white/60 text-sm">Total usuários</div>
                 </div>
-                <div className="text-white/60 text-sm">Receita total</div>
+
+                <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-sm rounded-2xl p-4 border border-green-500/30">
+                  <div className="text-3xl mb-2">✅</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticas.usuariosAtivos}
+                  </div>
+                  <div className="text-white/60 text-sm">Com créditos</div>
+                </div>
+
+                <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-sm rounded-2xl p-4 border border-blue-500/30">
+                  <div className="text-3xl mb-2">🔮</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticas.totalConsultas}
+                  </div>
+                  <div className="text-white/60 text-sm">Total consultas</div>
+                </div>
+
+                <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 backdrop-blur-sm rounded-2xl p-4 border border-yellow-500/30">
+                  <div className="text-3xl mb-2">📅</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticas.consultasHoje}
+                  </div>
+                  <div className="text-white/60 text-sm">Consultas hoje</div>
+                </div>
+
+                <div className="bg-gradient-to-br from-pink-500/20 to-rose-500/20 backdrop-blur-sm rounded-2xl p-4 border border-pink-500/30">
+                  <div className="text-3xl mb-2">💰</div>
+                  <div className="text-2xl font-bold text-white">
+                    R$ {estatisticas.receitaMes.toFixed(0)}
+                  </div>
+                  <div className="text-white/60 text-sm">Receita mês</div>
+                </div>
+
+                <div className="bg-gradient-to-br from-indigo-500/20 to-violet-500/20 backdrop-blur-sm rounded-2xl p-4 border border-indigo-500/30">
+                  <div className="text-3xl mb-2">💎</div>
+                  <div className="text-2xl font-bold text-white">
+                    R$ {estatisticas.receitaTotal.toFixed(0)}
+                  </div>
+                  <div className="text-white/60 text-sm">Receita total</div>
+                </div>
               </div>
             </div>
 
