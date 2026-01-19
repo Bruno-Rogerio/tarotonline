@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -51,14 +51,6 @@ type Estatisticas = {
   usuariosAtivos: number;
 };
 
-type Notificacao = {
-  id: string;
-  tipo: "consulta" | "pagamento";
-  mensagem: string;
-  data: Date;
-  lida: boolean;
-};
-
 export default function AdminPage() {
   const [abaAtiva, setAbaAtiva] = useState<
     "dashboard" | "consultas" | "pagamentos" | "usuarios"
@@ -78,20 +70,14 @@ export default function AdminPage() {
     receitaMes: 0,
     usuariosAtivos: 0,
   });
-  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
-  const [mostrarNotificacoes, setMostrarNotificacoes] = useState(false);
   const [adminId, setAdminId] = useState("");
   const [loading, setLoading] = useState(true);
   const [modalCreditos, setModalCreditos] = useState<Usuario | null>(null);
   const [minutosAdicionar, setMinutosAdicionar] = useState(10);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [novaAtividade, setNovaAtividade] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    // Criar elemento de áudio para notificações
-    if (typeof window !== "undefined") {
-      audioRef.current = new Audio("/notification.mp3");
-    }
     verificarAdmin();
   }, []);
 
@@ -107,6 +93,16 @@ export default function AdminPage() {
       setUsuariosFiltrados(usuarios);
     }
   }, [busca, usuarios]);
+
+  // Atualizar título da página com contadores
+  useEffect(() => {
+    const total = sessoesPendentes.length + comprasPendentes.length;
+    if (total > 0) {
+      document.title = `(${total}) Admin - Viaa Tarot`;
+    } else {
+      document.title = "Admin - Viaa Tarot";
+    }
+  }, [sessoesPendentes.length, comprasPendentes.length]);
 
   async function verificarAdmin() {
     const {
@@ -143,10 +139,9 @@ export default function AdminPage() {
           schema: "public",
           table: "sessoes",
         },
-        (payload) => {
+        () => {
           carregarSessoesPendentes();
-          adicionarNotificacao("consulta", "Nova solicitação de consulta!");
-          tocarSom();
+          mostrarAlertaNovaAtividade();
         }
       )
       .on(
@@ -156,10 +151,9 @@ export default function AdminPage() {
           schema: "public",
           table: "compras",
         },
-        (payload) => {
+        () => {
           carregarComprasPendentes();
-          adicionarNotificacao("pagamento", "Novo pagamento pendente!");
-          tocarSom();
+          mostrarAlertaNovaAtividade();
         }
       )
       .subscribe();
@@ -171,28 +165,9 @@ export default function AdminPage() {
     };
   }
 
-  function tocarSom() {
-    if (audioRef.current) {
-      audioRef.current.play().catch(() => {});
-    }
-  }
-
-  function adicionarNotificacao(
-    tipo: "consulta" | "pagamento",
-    mensagem: string
-  ) {
-    const nova: Notificacao = {
-      id: Date.now().toString(),
-      tipo,
-      mensagem,
-      data: new Date(),
-      lida: false,
-    };
-    setNotificacoes((prev) => [nova, ...prev].slice(0, 20));
-  }
-
-  function marcarTodasLidas() {
-    setNotificacoes((prev) => prev.map((n) => ({ ...n, lida: true })));
+  function mostrarAlertaNovaAtividade() {
+    setNovaAtividade(true);
+    setTimeout(() => setNovaAtividade(false), 5000);
   }
 
   async function carregarDados() {
@@ -205,19 +180,16 @@ export default function AdminPage() {
   }
 
   async function carregarEstatisticas() {
-    // Total de usuários
     const { count: totalUsuarios } = await supabase
       .from("usuarios")
       .select("*", { count: "exact", head: true })
       .eq("tipo", "cliente");
 
-    // Total de consultas finalizadas
     const { count: totalConsultas } = await supabase
       .from("sessoes")
       .select("*", { count: "exact", head: true })
       .eq("status", "finalizada");
 
-    // Consultas hoje
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const { count: consultasHoje } = await supabase
@@ -226,7 +198,6 @@ export default function AdminPage() {
       .eq("status", "finalizada")
       .gte("created_at", hoje.toISOString());
 
-    // Receita total
     const { data: comprasAprovadas } = await supabase
       .from("compras")
       .select("valor")
@@ -235,7 +206,6 @@ export default function AdminPage() {
     const receitaTotal =
       comprasAprovadas?.reduce((acc, c) => acc + c.valor, 0) || 0;
 
-    // Receita do mês
     const inicioMes = new Date();
     inicioMes.setDate(1);
     inicioMes.setHours(0, 0, 0, 0);
@@ -247,7 +217,6 @@ export default function AdminPage() {
 
     const receitaMes = comprasMes?.reduce((acc, c) => acc + c.valor, 0) || 0;
 
-    // Usuários ativos (com minutos > 0)
     const { count: usuariosAtivos } = await supabase
       .from("usuarios")
       .select("*", { count: "exact", head: true })
@@ -423,7 +392,7 @@ export default function AdminPage() {
     router.push("/");
   }
 
-  const notificacoesNaoLidas = notificacoes.filter((n) => !n.lida).length;
+  const totalPendentes = sessoesPendentes.length + comprasPendentes.length;
 
   if (loading) {
     return (
@@ -438,8 +407,21 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-950 via-indigo-950 to-purple-900">
+      {/* Toast de nova atividade */}
+      {novaAtividade && (
+        <div className="fixed top-4 right-4 z-50 animate-bounce">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+            <span className="text-2xl">🔔</span>
+            <div>
+              <p className="font-bold">Nova atividade!</p>
+              <p className="text-sm text-white/80">Verifique as pendências</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <header className="bg-black/30 backdrop-blur-md border-b border-purple-500/20 sticky top-0 z-50">
+      <header className="bg-black/30 backdrop-blur-md border-b border-purple-500/20 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             {/* Logo */}
@@ -451,77 +433,15 @@ export default function AdminPage() {
               <span className="bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full ml-2">
                 Admin
               </span>
+              {totalPendentes > 0 && (
+                <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
+                  {totalPendentes} pendente{totalPendentes > 1 ? "s" : ""}
+                </span>
+              )}
             </Link>
 
             {/* Ações */}
             <div className="flex items-center gap-2 md:gap-4">
-              {/* Notificações */}
-              <div className="relative">
-                <button
-                  onClick={() => setMostrarNotificacoes(!mostrarNotificacoes)}
-                  className="relative p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all"
-                >
-                  <span className="text-xl">🔔</span>
-                  {notificacoesNaoLidas > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
-                      {notificacoesNaoLidas}
-                    </span>
-                  )}
-                </button>
-
-                {/* Dropdown notificações */}
-                {mostrarNotificacoes && (
-                  <div className="absolute right-0 mt-2 w-80 bg-gray-900/95 backdrop-blur-xl rounded-xl border border-white/20 shadow-2xl overflow-hidden z-50">
-                    <div className="flex items-center justify-between p-3 border-b border-white/10">
-                      <span className="text-white font-semibold">
-                        Notificações
-                      </span>
-                      {notificacoesNaoLidas > 0 && (
-                        <button
-                          onClick={marcarTodasLidas}
-                          className="text-purple-400 text-xs hover:text-purple-300"
-                        >
-                          Marcar todas lidas
-                        </button>
-                      )}
-                    </div>
-                    <div className="max-h-80 overflow-y-auto">
-                      {notificacoes.length === 0 ? (
-                        <div className="p-4 text-center text-white/50 text-sm">
-                          Nenhuma notificação
-                        </div>
-                      ) : (
-                        notificacoes.map((n) => (
-                          <div
-                            key={n.id}
-                            className={`p-3 border-b border-white/5 ${
-                              !n.lida ? "bg-purple-500/10" : ""
-                            }`}
-                          >
-                            <div className="flex items-start gap-2">
-                              <span className="text-lg">
-                                {n.tipo === "consulta" ? "💬" : "💳"}
-                              </span>
-                              <div className="flex-1">
-                                <p className="text-white text-sm">
-                                  {n.mensagem}
-                                </p>
-                                <p className="text-white/40 text-xs mt-1">
-                                  {n.data.toLocaleTimeString("pt-BR")}
-                                </p>
-                              </div>
-                              {!n.lida && (
-                                <span className="w-2 h-2 bg-purple-500 rounded-full" />
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <Link
                 href="/"
                 className="text-white/60 hover:text-white text-sm hidden sm:block"
@@ -543,7 +463,7 @@ export default function AdminPage() {
         {/* Abas */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           {[
-            { id: "dashboard", label: "Dashboard", icon: "📊" },
+            { id: "dashboard", label: "Dashboard", icon: "📊", count: 0 },
             {
               id: "consultas",
               label: "Consultas",
@@ -556,25 +476,29 @@ export default function AdminPage() {
               icon: "💳",
               count: comprasPendentes.length,
             },
-            { id: "usuarios", label: "Usuários", icon: "👥" },
+            { id: "usuarios", label: "Usuários", icon: "👥", count: 0 },
           ].map((aba) => (
             <button
               key={aba.id}
               onClick={() => setAbaAtiva(aba.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all whitespace-nowrap ${
+              className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all whitespace-nowrap ${
                 abaAtiva === aba.id
                   ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30"
                   : "bg-white/10 text-white/70 hover:bg-white/20"
+              } ${
+                aba.count > 0 && abaAtiva !== aba.id
+                  ? "ring-2 ring-red-500 ring-offset-2 ring-offset-purple-950"
+                  : ""
               }`}
             >
               <span>{aba.icon}</span>
               <span className="hidden sm:inline">{aba.label}</span>
-              {aba.count !== undefined && aba.count > 0 && (
+              {aba.count > 0 && (
                 <span
-                  className={`px-2 py-0.5 rounded-full text-xs ${
+                  className={`absolute -top-2 -right-2 min-w-[20px] h-5 flex items-center justify-center px-1.5 rounded-full text-xs font-bold ${
                     abaAtiva === aba.id
-                      ? "bg-white/20"
-                      : "bg-red-500 text-white"
+                      ? "bg-white text-purple-600"
+                      : "bg-red-500 text-white animate-pulse"
                   }`}
                 >
                   {aba.count}
@@ -587,6 +511,41 @@ export default function AdminPage() {
         {/* DASHBOARD */}
         {abaAtiva === "dashboard" && (
           <div className="space-y-6">
+            {/* Alerta de pendências */}
+            {totalPendentes > 0 && (
+              <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-2xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">⚠️</span>
+                  <div>
+                    <p className="text-white font-bold">
+                      Você tem {totalPendentes} item
+                      {totalPendentes > 1 ? "s" : ""} pendente
+                      {totalPendentes > 1 ? "s" : ""}!
+                    </p>
+                    <p className="text-white/70 text-sm">
+                      {sessoesPendentes.length > 0 &&
+                        `${sessoesPendentes.length} consulta(s)`}
+                      {sessoesPendentes.length > 0 &&
+                        comprasPendentes.length > 0 &&
+                        " • "}
+                      {comprasPendentes.length > 0 &&
+                        `${comprasPendentes.length} pagamento(s)`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() =>
+                    setAbaAtiva(
+                      sessoesPendentes.length > 0 ? "consultas" : "pagamentos"
+                    )
+                  }
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all text-sm font-medium"
+                >
+                  Ver agora →
+                </button>
+              </div>
+            )}
+
             {/* Cards de estatísticas */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
@@ -641,19 +600,27 @@ export default function AdminPage() {
             {/* Ações rápidas */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Consultas pendentes */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
+              <div
+                className={`bg-white/10 backdrop-blur-sm rounded-2xl p-5 border transition-all ${
+                  sessoesPendentes.length > 0
+                    ? "border-yellow-500/50 shadow-lg shadow-yellow-500/10"
+                    : "border-white/20"
+                }`}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-white font-bold flex items-center gap-2">
                     <span>💬</span> Consultas Pendentes
                   </h3>
-                  <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full">
-                    {sessoesPendentes.length}
-                  </span>
+                  {sessoesPendentes.length > 0 && (
+                    <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+                      {sessoesPendentes.length}
+                    </span>
+                  )}
                 </div>
 
                 {sessoesPendentes.length === 0 ? (
                   <p className="text-white/50 text-sm">
-                    Nenhuma consulta aguardando
+                    ✅ Nenhuma consulta aguardando
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -691,19 +658,27 @@ export default function AdminPage() {
               </div>
 
               {/* Pagamentos pendentes */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
+              <div
+                className={`bg-white/10 backdrop-blur-sm rounded-2xl p-5 border transition-all ${
+                  comprasPendentes.length > 0
+                    ? "border-yellow-500/50 shadow-lg shadow-yellow-500/10"
+                    : "border-white/20"
+                }`}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-white font-bold flex items-center gap-2">
                     <span>💳</span> Pagamentos Pendentes
                   </h3>
-                  <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full">
-                    {comprasPendentes.length}
-                  </span>
+                  {comprasPendentes.length > 0 && (
+                    <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+                      {comprasPendentes.length}
+                    </span>
+                  )}
                 </div>
 
                 {comprasPendentes.length === 0 ? (
                   <p className="text-white/50 text-sm">
-                    Nenhum pagamento aguardando
+                    ✅ Nenhum pagamento aguardando
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -765,7 +740,7 @@ export default function AdminPage() {
                 {sessoesPendentes.map((sessao) => (
                   <div
                     key={sessao.id}
-                    className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20 hover:border-purple-500/30 transition-all"
+                    className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-yellow-500/30 hover:border-purple-500/30 transition-all shadow-lg shadow-yellow-500/5"
                   >
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
@@ -847,7 +822,7 @@ export default function AdminPage() {
                 {comprasPendentes.map((compra) => (
                   <div
                     key={compra.id}
-                    className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20 hover:border-green-500/30 transition-all"
+                    className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-yellow-500/30 hover:border-green-500/30 transition-all shadow-lg shadow-yellow-500/5"
                   >
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
@@ -907,7 +882,6 @@ export default function AdminPage() {
                 <span>👥</span> Gerenciar Usuários
               </h2>
 
-              {/* Busca */}
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">
                   🔍
@@ -923,7 +897,6 @@ export default function AdminPage() {
             </div>
 
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 overflow-hidden">
-              {/* Header da tabela */}
               <div className="hidden md:grid grid-cols-5 gap-4 p-4 bg-white/5 border-b border-white/10 text-white/60 text-sm font-medium">
                 <div>Nome</div>
                 <div>Telefone</div>
@@ -932,7 +905,6 @@ export default function AdminPage() {
                 <div className="text-right">Ações</div>
               </div>
 
-              {/* Lista de usuários */}
               <div className="divide-y divide-white/10">
                 {usuariosFiltrados.length === 0 ? (
                   <div className="p-8 text-center text-white/50">
@@ -944,7 +916,6 @@ export default function AdminPage() {
                       key={usuario.id}
                       className="p-4 hover:bg-white/5 transition-colors"
                     >
-                      {/* Mobile */}
                       <div className="md:hidden space-y-3">
                         <div className="flex items-center justify-between">
                           <div>
@@ -969,7 +940,6 @@ export default function AdminPage() {
                         </button>
                       </div>
 
-                      {/* Desktop */}
                       <div className="hidden md:grid grid-cols-5 gap-4 items-center">
                         <div className="text-white font-medium">
                           {usuario.nome}
@@ -1076,14 +1046,6 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Click outside para fechar notificações */}
-      {mostrarNotificacoes && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setMostrarNotificacoes(false)}
-        />
       )}
     </div>
   );
