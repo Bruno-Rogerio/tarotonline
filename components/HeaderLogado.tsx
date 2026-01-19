@@ -31,9 +31,11 @@ export default function HeaderLogado({ usuario }: { usuario: Usuario }) {
           <div className="flex items-center justify-between md:hidden">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
-              <span className="text-2xl group-hover:scale-110 transition-transform">
-                🔮
-              </span>
+              <img
+                src="/logo.png"
+                alt="Viaa Tarot"
+                className="w-8 h-8 group-hover:scale-110 transition-transform"
+              />
               <span className="text-lg font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
                 Tarot Místico
               </span>
@@ -82,9 +84,11 @@ export default function HeaderLogado({ usuario }: { usuario: Usuario }) {
           <div className="hidden md:flex items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group">
-              <span className="text-3xl group-hover:scale-110 group-hover:rotate-12 transition-all duration-300">
-                🔮
-              </span>
+              <img
+                src="/logo.png"
+                alt="Viaa Tarot"
+                className="w-10 h-10 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300"
+              />
               <span className="text-2xl font-bold bg-gradient-to-r from-purple-300 via-pink-300 to-purple-300 bg-clip-text text-transparent group-hover:from-pink-300 group-hover:to-purple-300 transition-all">
                 Tarot Místico
               </span>

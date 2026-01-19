@@ -488,7 +488,7 @@ export default function AdminPage() {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
-              <span className="text-2xl">🔮</span>
+              <img src="/logo.png" alt="Viaa Tarot" className="w-8 h-8" />
               <span className="text-lg font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent hidden sm:inline">
                 Viaa Tarot
               </span>

@@ -84,9 +84,11 @@ export default function LoginPage() {
               href="/"
               className="inline-flex items-center gap-2 mb-4 group"
             >
-              <span className="text-4xl md:text-5xl group-hover:scale-110 group-hover:rotate-12 transition-all duration-300">
-                🔮
-              </span>
+              <img
+                src="/logo.png"
+                alt="Viaa Tarot"
+                className="w-16 h-16 md:w-20 md:h-20 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300"
+              />
             </Link>
             <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-300 via-pink-300 to-purple-300 bg-clip-text text-transparent mb-2">
               Viaa Tarot

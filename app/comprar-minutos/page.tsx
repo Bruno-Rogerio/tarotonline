@@ -363,7 +363,7 @@ export default function ComprarMinutosPage() {
       <header className="relative bg-black/30 backdrop-blur-md border-b border-white/10 -mx-4 -mt-4 mb-6 px-4 py-3 sticky top-0 z-50">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl">🔮</span>
+            <img src="/logo.png" alt="Viaa Tarot" className="w-8 h-8" />
             <span className="text-lg font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
               Viaa Tarot
             </span>

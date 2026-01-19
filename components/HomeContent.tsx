@@ -313,9 +313,11 @@ export default function HomeContent({
           <div className="container mx-auto px-4 py-3 md:py-4 flex items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 md:gap-3 group">
-              <span className="text-2xl md:text-3xl group-hover:scale-110 group-hover:rotate-12 transition-all duration-300">
-                🔮
-              </span>
+              <img
+                src="/logo.png"
+                alt="Viaa Tarot"
+                className="w-8 h-8 md:w-10 md:h-10 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300"
+              />
               <span className="text-lg md:text-2xl font-bold bg-gradient-to-r from-purple-300 via-pink-300 to-purple-300 bg-clip-text text-transparent">
                 Viaa Tarot
               </span>
@@ -578,7 +580,7 @@ export default function HomeContent({
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             {/* Logo */}
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🔮</span>
+              <img src="/logo.png" alt="Viaa Tarot" className="w-8 h-8" />
               <span className="text-lg font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
                 Viaa Tarot
               </span>
