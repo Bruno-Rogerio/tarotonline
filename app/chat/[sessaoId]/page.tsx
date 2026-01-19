@@ -351,6 +351,7 @@ export default function ChatPage() {
       console.error("❌ Erro ao finalizar:", error);
     }
 
+    // Atualizar minutos do usuário
     const { data: u } = await supabase
       .from("usuarios")
       .select("minutos_disponiveis")
@@ -365,10 +366,29 @@ export default function ChatPage() {
         .eq("id", sessao.usuario_id);
     }
 
-    alert(`⏰ Consulta finalizada! Tempo utilizado: ${minutosUsados} minutos`);
+    // ✅ NOVO: Incrementar contador de consultas do tarólogo
+    const { data: tarologoData } = await supabase
+      .from("tarologos")
+      .select("total_consultas")
+      .eq("id", sessao.tarologo)
+      .single();
 
+    if (tarologoData) {
+      await supabase
+        .from("tarologos")
+        .update({ total_consultas: (tarologoData.total_consultas || 0) + 1 })
+        .eq("id", sessao.tarologo);
+    }
+
+    alert(`⏰ Consulta finalizada! Tempo usado: ${minutosUsados} minutos`);
+
+    // ✅ MODIFICADO: Redirecionar cliente para avaliação, admin para home
     setTimeout(() => {
-      router.push("/");
+      if (isAdmin) {
+        router.push("/");
+      } else {
+        router.push(`/avaliar/${sessaoId}`);
+      }
       router.refresh();
     }, 2000);
   }
