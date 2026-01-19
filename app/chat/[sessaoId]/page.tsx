@@ -455,7 +455,7 @@ export default function ChatPage() {
     <div
       style={{
         flex: mobile ? "none" : 1,
-        height: mobile ? "240px" : "auto",
+        height: mobile ? "280px" : "auto",
         minWidth: 0,
         backgroundColor: "rgba(255,255,255,0.1)",
         backdropFilter: "blur(4px)",
@@ -541,7 +541,7 @@ export default function ChatPage() {
                     flexDirection: "column",
                     position: "relative",
                     aspectRatio: "2/3",
-                    maxHeight: mobile ? "215px" : "180px",
+                    maxHeight: mobile ? "240px" : "180px",
                     overflow: "hidden",
                   }}
                 >
