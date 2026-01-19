@@ -450,7 +450,7 @@ export default function HomeContent({
           <div className="grid grid-cols-3 gap-4 md:gap-8 max-w-lg mx-auto mt-12 md:mt-16">
             <div className="text-center">
               <div className="text-2xl md:text-4xl font-bold text-white mb-1">
-                500+
+                5000+
               </div>
               <div className="text-purple-300/70 text-xs md:text-sm">
                 Consultas
@@ -590,15 +590,15 @@ export default function HomeContent({
 
             <div className="relative z-10 text-center">
               <h2 className="text-2xl md:text-4xl font-bold text-white mb-4">
-                Pronto para descobrir seu{" "}
+                Uma leitura para iluminar seu{" "}
                 <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  destino
+                  dia
                 </span>
                 ?
               </h2>
               <p className="text-purple-200/80 mb-8 max-w-lg mx-auto text-sm md:text-base">
-                Junte-se a milhares de pessoas que já transformaram suas vidas
-                através do tarot
+                Junte-se a milhares de pessoas que já encontraram clareza e
+                autoconhecimento através do tarot.
               </p>
               <Link
                 href="/cadastro"
