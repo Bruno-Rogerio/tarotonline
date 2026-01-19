@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   title: "Viaa Tarot",
   description: "Consulte nossos tarológos especializados online",
   icons: {
-    icon: "/logo2.png",
+    icon: "/logo.png",
   },
 };
 
