@@ -80,6 +80,7 @@ export default function ChatPage() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const sessaoRef = useRef<Sessao | null>(null);
 
   const cartasFiltradas = buscarCarta
     ? CARTAS_TAROT.filter((c) =>
@@ -141,6 +142,10 @@ export default function ChatPage() {
       );
     }
   }, [mensagens]);
+
+  useEffect(() => {
+    sessaoRef.current = sessao;
+  }, [sessao]);
 
   async function carregarDados() {
     const {
@@ -293,7 +298,11 @@ export default function ChatPage() {
       const decorrido = Math.floor((Date.now() - inicio) / 1000);
       setTempoDecorrido(decorrido);
 
-      const saldoSegundos = sessao.minutos_comprados * 60;
+      // USA O REF PARA PEGAR O VALOR ATUALIZADO
+      const minutosAtuais =
+        sessaoRef.current?.minutos_comprados || sessao.minutos_comprados;
+      const saldoSegundos = minutosAtuais * 60;
+
       if (decorrido >= saldoSegundos) {
         finalizarSessao();
       }
@@ -302,7 +311,6 @@ export default function ChatPage() {
     atualizar();
     timerRef.current = setInterval(atualizar, 1000);
   }
-
   async function carregarMensagens() {
     const { data } = await supabase
       .from("mensagens")
