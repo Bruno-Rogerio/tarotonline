@@ -741,145 +741,6 @@ export default function ChatPage() {
   );
 
   // ========== COMPONENTE CHAT (CORRIGIDO) ==========
-  const ChatMensagens = ({ mobile = false }: { mobile?: boolean }) => (
-    <div
-      style={{
-        flex: 1,
-        minWidth: 0,
-        minHeight: 0,
-        backgroundColor: "rgba(255,255,255,0.1)",
-        backdropFilter: "blur(4px)",
-        borderRadius: "0.75rem",
-        border: "1px solid rgba(255,255,255,0.2)",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}
-    >
-      {/* CORREÇÃO: Container de mensagens sem display flex */}
-      <div
-        ref={messagesContainerRef}
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-          padding: "0.75rem",
-        }}
-      >
-        {mensagens.map((msg) => {
-          const isMinha = msg.remetente_id === usuarioId;
-          return (
-            <div
-              key={msg.id}
-              style={{
-                display: "flex",
-                justifyContent: isMinha ? "flex-end" : "flex-start",
-                marginBottom: "0.5rem",
-              }}
-            >
-              <div
-                style={{
-                  maxWidth: "70%",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: "0.5rem",
-                  backgroundColor: isMinha
-                    ? "rgb(147, 51, 234)"
-                    : "rgba(255,255,255,0.2)",
-                  color: "white",
-                }}
-              >
-                {!isMinha && (
-                  <p
-                    style={{
-                      fontSize: "0.75rem",
-                      fontWeight: "600",
-                      marginBottom: "0.25rem",
-                      color: "rgb(216, 180, 254)",
-                    }}
-                  >
-                    {getNome(msg.remetente_id)}
-                  </p>
-                )}
-                <p
-                  style={{
-                    wordBreak: "break-word",
-                    fontSize: "0.875rem",
-                    margin: 0,
-                  }}
-                >
-                  {msg.mensagem}
-                </p>
-                <p
-                  style={{
-                    fontSize: "0.75rem",
-                    opacity: 0.6,
-                    marginTop: "0.25rem",
-                    margin: 0,
-                  }}
-                >
-                  {new Date(msg.created_at).toLocaleTimeString("pt-BR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-        {/* CORREÇÃO: Elemento âncora para scroll */}
-        <div ref={messagesEndRef} />
-      </div>
-
-      <form
-        onSubmit={enviarMensagem}
-        style={{
-          padding: "0.75rem",
-          borderTop: "1px solid rgba(255,255,255,0.2)",
-          flexShrink: 0,
-        }}
-      >
-        {chatAtivo ? (
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <input
-              type="text"
-              value={novaMensagem}
-              onChange={(e) => setNovaMensagem(e.target.value)}
-              placeholder="Digite sua mensagem..."
-              autoFocus
-              style={{
-                flex: 1,
-                padding: "0.5rem 1rem",
-                backgroundColor: "rgba(255,255,255,0.1)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                borderRadius: "0.5rem",
-                color: "white",
-              }}
-            />
-            <button
-              type="submit"
-              style={{
-                padding: "0.5rem 1.5rem",
-                backgroundColor: "rgb(147, 51, 234)",
-                color: "white",
-                borderRadius: "0.5rem",
-                fontWeight: "500",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Enviar
-            </button>
-          </div>
-        ) : (
-          <div style={{ textAlign: "center", padding: "0.5rem" }}>
-            <p style={{ color: "rgb(252, 165, 165)", fontWeight: "500" }}>
-              ⏰ Consulta finalizada
-            </p>
-          </div>
-        )}
-      </form>
-    </div>
-  );
 
   return (
     <div
@@ -1038,7 +899,141 @@ export default function ChatPage() {
         >
           {isMobile && <MesaCartas mobile={true} />}
           {!isMobile && <MesaCartas mobile={false} />}
-          <ChatMensagens mobile={isMobile} />
+          {/* ========== CHAT INLINE ========== */}
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              minHeight: 0,
+              backgroundColor: "rgba(255,255,255,0.1)",
+              backdropFilter: "blur(4px)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(255,255,255,0.2)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              ref={messagesContainerRef}
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                padding: "0.75rem",
+              }}
+            >
+              {mensagens.map((msg) => {
+                const isMinha = msg.remetente_id === usuarioId;
+                return (
+                  <div
+                    key={msg.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: isMinha ? "flex-end" : "flex-start",
+                      marginBottom: "0.5rem",
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: "70%",
+                        padding: "0.5rem 0.75rem",
+                        borderRadius: "0.5rem",
+                        backgroundColor: isMinha
+                          ? "rgb(147, 51, 234)"
+                          : "rgba(255,255,255,0.2)",
+                        color: "white",
+                      }}
+                    >
+                      {!isMinha && (
+                        <p
+                          style={{
+                            fontSize: "0.75rem",
+                            fontWeight: "600",
+                            marginBottom: "0.25rem",
+                            color: "rgb(216, 180, 254)",
+                          }}
+                        >
+                          {getNome(msg.remetente_id)}
+                        </p>
+                      )}
+                      <p
+                        style={{
+                          wordBreak: "break-word",
+                          fontSize: "0.875rem",
+                          margin: 0,
+                        }}
+                      >
+                        {msg.mensagem}
+                      </p>
+                      <p
+                        style={{
+                          fontSize: "0.75rem",
+                          opacity: 0.6,
+                          marginTop: "0.25rem",
+                          margin: 0,
+                        }}
+                      >
+                        {new Date(msg.created_at).toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <form
+              onSubmit={enviarMensagem}
+              style={{
+                padding: "0.75rem",
+                borderTop: "1px solid rgba(255,255,255,0.2)",
+                flexShrink: 0,
+              }}
+            >
+              {chatAtivo ? (
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <input
+                    type="text"
+                    value={novaMensagem}
+                    onChange={(e) => setNovaMensagem(e.target.value)}
+                    placeholder="Digite sua mensagem..."
+                    autoFocus
+                    style={{
+                      flex: 1,
+                      padding: "0.5rem 1rem",
+                      backgroundColor: "rgba(255,255,255,0.1)",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      borderRadius: "0.5rem",
+                      color: "white",
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      padding: "0.5rem 1.5rem",
+                      backgroundColor: "rgb(147, 51, 234)",
+                      color: "white",
+                      borderRadius: "0.5rem",
+                      fontWeight: "500",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Enviar
+                  </button>
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", padding: "0.5rem" }}>
+                  <p style={{ color: "rgb(252, 165, 165)", fontWeight: "500" }}>
+                    ⏰ Consulta finalizada
+                  </p>
+                </div>
+              )}
+            </form>
+          </div>
         </div>
       </div>
     </div>
