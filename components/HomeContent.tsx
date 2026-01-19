@@ -363,21 +363,22 @@ export default function HomeContent({
 
           {/* Título */}
           <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6">
-            <span className="text-white">Descubra seu </span>
+            <span className="text-white">Tarot online para quem busca </span>
             <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
-              destino
+              clareza
             </span>
             <br className="md:hidden" />
-            <span className="text-white"> através do </span>
+            <span className="text-white"> e </span>
             <span className="bg-gradient-to-r from-pink-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Tarot
+              direcionamento
             </span>
           </h1>
 
           {/* Subtítulo */}
           <p className="text-purple-200/80 text-base md:text-xl max-w-2xl mx-auto mb-8 md:mb-10 px-4">
-            Consulte nossos tarológos especializados e receba orientações
-            personalizadas para sua vida
+            A Viaa Tarot conecta você a tarólogos experientes , oferecendo
+            consultas individuais, claras e personalizadas, com privacidade e
+            transparência, no momento em que você precisar.
           </p>
 
           {/* CTA Buttons */}
