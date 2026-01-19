@@ -78,6 +78,7 @@ export default function ChatPage() {
   const [isMobile, setIsMobile] = useState(false);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const cartasFiltradas = buscarCarta
@@ -107,17 +108,11 @@ export default function ChatPage() {
     if (sessao?.status === "em_andamento") iniciarTimer();
   }, [sessao]);
 
-  // Scroll automático quando mensagens mudam
+  // CORREÇÃO: Scroll automático usando scrollIntoView
   useEffect(() => {
-    const scrollToBottom = () => {
-      if (messagesContainerRef.current) {
-        messagesContainerRef.current.scrollTop =
-          messagesContainerRef.current.scrollHeight;
-      }
-    };
-
-    // requestAnimationFrame garante que executa após o paint do browser
-    requestAnimationFrame(scrollToBottom);
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "auto" });
+    }
   }, [mensagens]);
 
   async function carregarDados() {
@@ -433,7 +428,7 @@ export default function ChatPage() {
     <div
       style={{
         flex: mobile ? "none" : 1,
-        height: mobile ? "240px" : "auto", // AUMENTADO: 200px → 220px
+        height: mobile ? "240px" : "auto",
         minWidth: 0,
         backgroundColor: "rgba(255,255,255,0.1)",
         backdropFilter: "blur(4px)",
@@ -503,7 +498,7 @@ export default function ChatPage() {
               <div
                 key={carta.id}
                 style={{
-                  width: mobile ? "135px" : "calc(33.333% - 0.35rem)", // AUMENTADO
+                  width: mobile ? "135px" : "calc(33.333% - 0.35rem)",
                   flexShrink: 0,
                 }}
               >
@@ -514,12 +509,12 @@ export default function ChatPage() {
                     borderRadius: "0.5rem",
                     border: "2px solid rgb(113, 63, 18)",
                     boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                    padding: "0.4rem", // REDUZIDO: 0.5rem → 0.4rem
+                    padding: "0.4rem",
                     display: "flex",
                     flexDirection: "column",
                     position: "relative",
                     aspectRatio: "2/3",
-                    maxHeight: mobile ? "215px" : "180px", // MESMO valor!
+                    maxHeight: mobile ? "215px" : "180px",
                     overflow: "hidden",
                   }}
                 >
@@ -549,7 +544,7 @@ export default function ChatPage() {
                       justifyContent: "center",
                       overflow: "hidden",
                       borderRadius: "0.25rem",
-                      marginBottom: "0.3rem", // Espaço pro nome
+                      marginBottom: "0.3rem",
                     }}
                   >
                     {imagemUrl ? (
@@ -583,10 +578,10 @@ export default function ChatPage() {
                   <div
                     style={{
                       backgroundColor: "rgba(0,0,0,0.9)",
-                      padding: "0.5rem 0.4rem", // Mais espaço vertical
+                      padding: "0.5rem 0.4rem",
                       borderRadius: "0.25rem",
                       flexShrink: 0,
-                      minHeight: "24px", // ADICIONADO - garante espaço mínimo
+                      minHeight: "24px",
                     }}
                   >
                     <p
@@ -718,7 +713,7 @@ export default function ChatPage() {
     </div>
   );
 
-  // ========== COMPONENTE CHAT ==========
+  // ========== COMPONENTE CHAT (CORRIGIDO) ==========
   const ChatMensagens = ({ mobile = false }: { mobile?: boolean }) => (
     <div
       style={{
@@ -731,8 +726,10 @@ export default function ChatPage() {
         border: "1px solid rgba(255,255,255,0.2)",
         display: "flex",
         flexDirection: "column",
+        overflow: "hidden",
       }}
     >
+      {/* CORREÇÃO: Container de mensagens sem display flex */}
       <div
         ref={messagesContainerRef}
         style={{
@@ -740,76 +737,70 @@ export default function ChatPage() {
           minHeight: 0,
           overflowY: "auto",
           padding: "0.75rem",
-          display: "flex",
-          flexDirection: "column", // IMPORTANTE
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.5rem",
-            minHeight: "100%",
-          }}
-        >
-          {mensagens.map((msg) => {
-            const isMinha = msg.remetente_id === usuarioId;
-            return (
+        {mensagens.map((msg) => {
+          const isMinha = msg.remetente_id === usuarioId;
+          return (
+            <div
+              key={msg.id}
+              style={{
+                display: "flex",
+                justifyContent: isMinha ? "flex-end" : "flex-start",
+                marginBottom: "0.5rem",
+              }}
+            >
               <div
-                key={msg.id}
                 style={{
-                  display: "flex",
-                  justifyContent: isMinha ? "flex-end" : "flex-start",
+                  maxWidth: "70%",
+                  padding: "0.5rem 0.75rem",
+                  borderRadius: "0.5rem",
+                  backgroundColor: isMinha
+                    ? "rgb(147, 51, 234)"
+                    : "rgba(255,255,255,0.2)",
+                  color: "white",
                 }}
               >
-                <div
-                  style={{
-                    maxWidth: "70%",
-                    padding: "0.5rem 0.75rem",
-                    borderRadius: "0.5rem",
-                    backgroundColor: isMinha
-                      ? "rgb(147, 51, 234)"
-                      : "rgba(255,255,255,0.2)",
-                    color: "white",
-                  }}
-                >
-                  {!isMinha && (
-                    <p
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: "600",
-                        marginBottom: "0.25rem",
-                        color: "rgb(216, 180, 254)",
-                      }}
-                    >
-                      {getNome(msg.remetente_id)}
-                    </p>
-                  )}
-                  <p
-                    style={{
-                      wordBreak: "break-word",
-                      fontSize: "0.875rem",
-                    }}
-                  >
-                    {msg.mensagem}
-                  </p>
+                {!isMinha && (
                   <p
                     style={{
                       fontSize: "0.75rem",
-                      opacity: 0.6,
-                      marginTop: "0.25rem",
+                      fontWeight: "600",
+                      marginBottom: "0.25rem",
+                      color: "rgb(216, 180, 254)",
                     }}
                   >
-                    {new Date(msg.created_at).toLocaleTimeString("pt-BR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {getNome(msg.remetente_id)}
                   </p>
-                </div>
+                )}
+                <p
+                  style={{
+                    wordBreak: "break-word",
+                    fontSize: "0.875rem",
+                    margin: 0,
+                  }}
+                >
+                  {msg.mensagem}
+                </p>
+                <p
+                  style={{
+                    fontSize: "0.75rem",
+                    opacity: 0.6,
+                    marginTop: "0.25rem",
+                    margin: 0,
+                  }}
+                >
+                  {new Date(msg.created_at).toLocaleTimeString("pt-BR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
+        {/* CORREÇÃO: Elemento âncora para scroll */}
+        <div ref={messagesEndRef} />
       </div>
 
       <form
