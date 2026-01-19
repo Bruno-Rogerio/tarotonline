@@ -18,6 +18,7 @@ type Tarologo = {
   ordem: number | null;
   minutosRestantes?: number;
   proximaMudanca?: number;
+  definidoManualmente?: boolean;
 };
 
 type Usuario = {
@@ -149,12 +150,24 @@ export default function HomeContent({
           prev.map((t) => {
             if (t.id === tarologoId) {
               const agora = Date.now();
-              return {
-                ...t,
-                status,
-                minutosRestantes: status === "ocupado" ? 30 : undefined,
-                proximaMudanca: agora + 999999999,
-              };
+
+              if (status === "ocupado") {
+                return {
+                  ...t,
+                  status,
+                  minutosRestantes: 30,
+                  proximaMudanca: agora + 30 * 60000,
+                  definidoManualmente: true,
+                };
+              } else {
+                return {
+                  ...t,
+                  status,
+                  minutosRestantes: undefined,
+                  proximaMudanca: undefined,
+                  definidoManualmente: true,
+                };
+              }
             }
             return t;
           })
@@ -178,65 +191,70 @@ export default function HomeContent({
       const agora = Date.now();
 
       return prev.map((tarologo) => {
-        if (agora < (tarologo.proximaMudanca || 0)) {
-          if (tarologo.status === "ocupado" && tarologo.minutosRestantes) {
-            return {
-              ...tarologo,
-              minutosRestantes: Math.max(
-                0,
-                Math.floor((tarologo.proximaMudanca! - agora) / 60000)
-              ),
-            };
-          }
+        // Se foi definido manualmente e NÃO está ocupado, não muda nada
+        if (tarologo.definidoManualmente && tarologo.status !== "ocupado") {
           return tarologo;
         }
 
-        const rand = Math.random();
+        // Se está ocupado e ainda tem tempo, só atualiza os minutos restantes
+        if (tarologo.status === "ocupado" && tarologo.proximaMudanca) {
+          const tempoRestante = tarologo.proximaMudanca - agora;
 
-        if (tarologo.status === "disponivel") {
-          if (rand < 0.7) {
-            const minutos = Math.floor(Math.random() * 41) + 20;
+          if (tempoRestante > 0) {
             return {
               ...tarologo,
-              status: "ocupado",
-              minutosRestantes: minutos,
-              proximaMudanca: agora + minutos * 60000,
+              minutosRestantes: Math.ceil(tempoRestante / 60000),
             };
           } else {
-            const minutos = Math.floor(Math.random() * 31) + 15;
+            // Tempo acabou! Muda para indisponível
             return {
               ...tarologo,
               status: "indisponivel",
-              proximaMudanca: agora + minutos * 60000,
+              minutosRestantes: undefined,
+              proximaMudanca: undefined,
+              definidoManualmente: true, // Fica indisponível até admin mudar
             };
           }
-        } else if (tarologo.status === "ocupado") {
-          if (rand < 0.85) {
-            const minutos = Math.floor(Math.random() * 9) + 2;
+        }
+
+        // Para tarólogos não definidos manualmente (estado inicial aleatório)
+        if (
+          !tarologo.definidoManualmente &&
+          tarologo.proximaMudanca &&
+          agora >= tarologo.proximaMudanca
+        ) {
+          // Lógica aleatória original para simular mudanças
+          const rand = Math.random();
+
+          if (tarologo.status === "disponivel") {
+            if (rand < 0.7) {
+              const minutos = Math.floor(Math.random() * 41) + 20;
+              return {
+                ...tarologo,
+                status: "ocupado",
+                minutosRestantes: minutos,
+                proximaMudanca: agora + minutos * 60000,
+              };
+            } else {
+              const minutos = Math.floor(Math.random() * 31) + 15;
+              return {
+                ...tarologo,
+                status: "indisponivel",
+                proximaMudanca: agora + minutos * 60000,
+              };
+            }
+          } else if (tarologo.status === "indisponivel") {
+            const minutos = Math.floor(Math.random() * 5) + 1;
             return {
               ...tarologo,
               status: "disponivel",
               minutosRestantes: undefined,
               proximaMudanca: agora + minutos * 60000,
             };
-          } else {
-            const minutos = Math.floor(Math.random() * 21) + 20;
-            return {
-              ...tarologo,
-              status: "indisponivel",
-              minutosRestantes: undefined,
-              proximaMudanca: agora + minutos * 60000,
-            };
           }
-        } else {
-          const minutos = Math.floor(Math.random() * 5) + 1;
-          return {
-            ...tarologo,
-            status: "disponivel",
-            minutosRestantes: undefined,
-            proximaMudanca: agora + minutos * 60000,
-          };
         }
+
+        return tarologo;
       });
     });
   }
@@ -273,12 +291,26 @@ export default function HomeContent({
       prev.map((t) => {
         if (t.id === tarologoId) {
           const agora = Date.now();
-          return {
-            ...t,
-            status: novoStatus,
-            minutosRestantes: novoStatus === "ocupado" ? 30 : undefined,
-            proximaMudanca: agora + 999999999,
-          };
+
+          if (novoStatus === "ocupado") {
+            // Ocupado por 30 minutos, depois vai para indisponível
+            return {
+              ...t,
+              status: novoStatus,
+              minutosRestantes: 30,
+              proximaMudanca: agora + 30 * 60000,
+              definidoManualmente: true,
+            };
+          } else {
+            // Disponível ou Indisponível ficam fixos até admin mudar
+            return {
+              ...t,
+              status: novoStatus,
+              minutosRestantes: undefined,
+              proximaMudanca: undefined,
+              definidoManualmente: true,
+            };
+          }
         }
         return t;
       })
