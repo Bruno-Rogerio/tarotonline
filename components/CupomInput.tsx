@@ -8,6 +8,7 @@ type CupomAplicado = {
   id: string;
   tipo_desconto: "porcentagem" | "valor_fixo" | "minutos_extras";
   valor_desconto: number;
+  desconto_maximo: number | null; // Limite máximo do desconto em R$
 };
 
 type Props = {
@@ -49,25 +50,32 @@ export default function CupomInput({ usuarioId, valorCompra, onCupomAplicado }: 
   }, [valorCompra, cupomAplicado]);
 
   function calcularDesconto(cupom: CupomAplicado, valor: number) {
+    let desconto = 0;
+    let minutosExtras = 0;
+
     switch (cupom.tipo_desconto) {
       case "porcentagem":
-        return { 
-          desconto: (valor * cupom.valor_desconto) / 100, 
-          minutosExtras: 0 
-        };
+        desconto = (valor * cupom.valor_desconto) / 100;
+        // Aplicar limite máximo se existir
+        if (cupom.desconto_maximo !== null && desconto > cupom.desconto_maximo) {
+          desconto = cupom.desconto_maximo;
+        }
+        break;
+
       case "valor_fixo":
-        return { 
-          desconto: Math.min(cupom.valor_desconto, valor), 
-          minutosExtras: 0 
-        };
+        desconto = Math.min(cupom.valor_desconto, valor);
+        // Para valor fixo, o desconto_maximo também pode limitar
+        if (cupom.desconto_maximo !== null && desconto > cupom.desconto_maximo) {
+          desconto = cupom.desconto_maximo;
+        }
+        break;
+
       case "minutos_extras":
-        return { 
-          desconto: 0, 
-          minutosExtras: cupom.valor_desconto 
-        };
-      default:
-        return { desconto: 0, minutosExtras: 0 };
+        minutosExtras = cupom.valor_desconto;
+        break;
     }
+
+    return { desconto, minutosExtras };
   }
 
   async function validarCupom(codigoParaValidar?: string) {
@@ -100,6 +108,7 @@ export default function CupomInput({ usuarioId, valorCompra, onCupomAplicado }: 
           id: data.cupom.id,
           tipo_desconto: data.cupom.tipo_desconto,
           valor_desconto: data.cupom.valor_desconto,
+          desconto_maximo: data.cupom.desconto_maximo || null,
         };
         
         setCupomAplicado(cupom);
@@ -126,32 +135,46 @@ export default function CupomInput({ usuarioId, valorCompra, onCupomAplicado }: 
     onCupomAplicado(null, 0, 0);
   }
 
-  function formatarDesconto(tipo: string, valor: number) {
-    switch (tipo) {
-      case "porcentagem": return `${valor}% OFF`;
-      case "valor_fixo": return `R$ ${valor.toFixed(2)} OFF`;
-      case "minutos_extras": return `+${valor} minutos extras`;
-      default: return "";
+  function formatarDesconto(cupom: CupomAplicado) {
+    switch (cupom.tipo_desconto) {
+      case "porcentagem":
+        let texto = `${cupom.valor_desconto}% OFF`;
+        if (cupom.desconto_maximo !== null) {
+          texto += ` (máx R$ ${cupom.desconto_maximo.toFixed(2)})`;
+        }
+        return texto;
+      case "valor_fixo":
+        return `R$ ${cupom.valor_desconto.toFixed(2)} OFF`;
+      case "minutos_extras":
+        return `+${cupom.valor_desconto} minutos extras`;
+      default:
+        return "";
     }
   }
 
   // Cupom aplicado com sucesso
   if (cupomAplicado) {
+    const { desconto, minutosExtras } = calcularDesconto(cupomAplicado, valorCompra);
+    
     return (
       <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-2xl">🎟️</span>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <code className="px-2 py-0.5 bg-green-500/30 text-green-300 rounded font-mono font-bold text-sm">
                   {cupomAplicado.codigo}
                 </code>
                 <span className="text-green-400 font-bold">
-                  {formatarDesconto(cupomAplicado.tipo_desconto, cupomAplicado.valor_desconto)}
+                  {formatarDesconto(cupomAplicado)}
                 </span>
               </div>
-              <div className="text-green-300/70 text-sm">Cupom aplicado!</div>
+              <div className="text-green-300/70 text-sm">
+                Cupom aplicado!
+                {desconto > 0 && ` (-R$ ${desconto.toFixed(2)})`}
+                {minutosExtras > 0 && ` (+${minutosExtras} min)`}
+              </div>
             </div>
           </div>
           <button

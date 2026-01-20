@@ -31,12 +31,10 @@ export async function GET(
     // Buscar histórico de uso
     const { data: usos } = await supabaseAdmin
       .from("cupons_uso")
-      .select(
-        `
+      .select(`
         *,
         usuario:usuarios(id, nome, telefone)
-      `
-      )
+      `)
       .eq("cupom_id", id)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -71,11 +69,7 @@ export async function PUT(
         .eq("id", id)
         .single();
 
-      if (
-        cupomAtual &&
-        cupomAtual.total_usos > 0 &&
-        body.codigo !== cupomAtual.codigo
-      ) {
+      if (cupomAtual && cupomAtual.total_usos > 0 && body.codigo !== cupomAtual.codigo) {
         return NextResponse.json(
           { error: "Não é possível alterar o código de um cupom já utilizado" },
           { status: 400 }
@@ -108,6 +102,7 @@ export async function PUT(
       "descricao",
       "tipo_desconto",
       "valor_desconto",
+      "desconto_maximo",
       "valor_minimo",
       "limite_total_usos",
       "limite_por_usuario",
@@ -171,15 +166,15 @@ export async function DELETE(
 
     if (cupom && cupom.total_usos > 0) {
       return NextResponse.json(
-        {
-          error:
-            "Não é possível excluir um cupom já utilizado. Desative-o em vez disso.",
-        },
+        { error: "Não é possível excluir um cupom já utilizado. Desative-o em vez disso." },
         { status: 400 }
       );
     }
 
-    const { error } = await supabaseAdmin.from("cupons").delete().eq("id", id);
+    const { error } = await supabaseAdmin
+      .from("cupons")
+      .delete()
+      .eq("id", id);
 
     if (error) {
       console.error("Erro ao excluir cupom:", error);

@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
         descricao: body.descricao || null,
         tipo_desconto: body.tipo_desconto,
         valor_desconto: body.valor_desconto,
+        desconto_maximo: body.desconto_maximo || null,
         valor_minimo: body.valor_minimo || 0,
         limite_total_usos: body.limite_total_usos || null,
         limite_por_usuario: body.limite_por_usuario || 1,

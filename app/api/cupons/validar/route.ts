@@ -40,10 +40,7 @@ export async function POST(request: NextRequest) {
     if (cupom.status !== "ativo") {
       return NextResponse.json({
         valido: false,
-        mensagem:
-          cupom.status === "expirado"
-            ? "Cupom expirado"
-            : "Cupom está desativado",
+        mensagem: cupom.status === "expirado" ? "Cupom expirado" : "Cupom está desativado",
       });
     }
 
@@ -73,17 +70,12 @@ export async function POST(request: NextRequest) {
     if (cupom.valor_minimo && valorCompra < cupom.valor_minimo) {
       return NextResponse.json({
         valido: false,
-        mensagem: `Valor mínimo para este cupom: R$ ${cupom.valor_minimo.toFixed(
-          2
-        )}`,
+        mensagem: `Valor mínimo para este cupom: R$ ${cupom.valor_minimo.toFixed(2)}`,
       });
     }
 
     // Verificar limite total de usos
-    if (
-      cupom.limite_total_usos !== null &&
-      cupom.total_usos >= cupom.limite_total_usos
-    ) {
+    if (cupom.limite_total_usos !== null && cupom.total_usos >= cupom.limite_total_usos) {
       return NextResponse.json({
         valido: false,
         mensagem: "Cupom esgotado",
@@ -134,8 +126,10 @@ export async function POST(request: NextRequest) {
       cupom: cupom,
       tipo_desconto: cupom.tipo_desconto,
       valor_desconto: cupom.valor_desconto,
+      desconto_maximo: cupom.desconto_maximo,
       mensagem: "Cupom válido!",
     });
+
   } catch (error: any) {
     console.error("❌ Erro na API de validação:", error);
     return NextResponse.json(
