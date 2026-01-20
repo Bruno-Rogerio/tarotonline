@@ -13,18 +13,32 @@ const PRICE_IDS: Record<number, string> = {
 };
 
 export async function POST(request: NextRequest) {
+  console.log("🔵 Checkout API chamada");
+
   try {
-    const { minutos, usuarioId, email } = await request.json();
+    const body = await request.json();
+    console.log("📦 Body recebido:", body);
+
+    const { minutos, usuarioId, email } = body;
 
     const priceId = PRICE_IDS[minutos];
+    console.log("💰 Price ID:", priceId);
 
     if (!priceId) {
+      console.log("❌ Pacote inválido");
       return NextResponse.json({ error: "Pacote inválido" }, { status: 400 });
     }
 
-    // Usar a URL do request para construir as URLs de retorno
-    const origin =
-      request.headers.get("origin") || "https://viaa-tarot.vercel.app";
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.log("❌ STRIPE_SECRET_KEY não configurada");
+      return NextResponse.json(
+        { error: "Stripe não configurado" },
+        { status: 500 }
+      );
+    }
+
+    const origin = request.headers.get("origin") || "https://viaa.app.br";
+    console.log("🌐 Origin:", origin);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -37,18 +51,19 @@ export async function POST(request: NextRequest) {
       mode: "payment",
       success_url: `${origin}/pagamento-sucesso?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/comprar-minutos`,
-      customer_email: email,
+      customer_email: email || undefined,
       metadata: {
-        usuarioId,
+        usuarioId: usuarioId || "",
         minutos: minutos.toString(),
       },
     });
 
+    console.log("✅ Sessão criada:", session.id);
     return NextResponse.json({ url: session.url });
-  } catch (error) {
-    console.error("Erro ao criar sessão:", error);
+  } catch (error: any) {
+    console.error("❌ Erro ao criar sessão:", error.message);
     return NextResponse.json(
-      { error: "Erro ao criar sessão de pagamento" },
+      { error: error.message || "Erro ao criar sessão de pagamento" },
       { status: 500 }
     );
   }
