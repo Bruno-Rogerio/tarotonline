@@ -30,6 +30,14 @@ export default function ContatoPage() {
     window.location.href = `mailto:${emailDestino}?subject=${assuntoEmail}&body=${corpoEmail}`;
   }
 
+  function abrirWhatsAppDireto() {
+    window.open(`https://wa.me/${numeroWhatsApp}`, "_blank");
+  }
+
+  function abrirInstagram() {
+    window.open("https://instagram.com/viaa.tarot", "_blank");
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-950 via-indigo-950 to-purple-900">
       {/* Header */}
@@ -184,11 +192,12 @@ export default function ContatoPage() {
               <p className="text-white/80 mb-4">
                 Atendimento de segunda a sábado, das 9h às 22h.
               </p>
-              href={`https://wa.me/${numeroWhatsApp}`}
-              target="_blank" rel="noopener noreferrer" className="block w-full
-              py-3 bg-green-500 hover:bg-green-400 text-white font-semibold
-              rounded-xl transition-all text-center"
-              <a>Iniciar conversa</a>
+              <button
+                onClick={abrirWhatsAppDireto}
+                className="block w-full py-3 bg-green-500 hover:bg-green-400 text-white font-semibold rounded-xl transition-all text-center cursor-pointer"
+              >
+                Iniciar conversa
+              </button>
             </div>
 
             {/* Card E-mail */}
@@ -215,19 +224,12 @@ export default function ContatoPage() {
               <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
                 <span>🌟</span> Siga-nos
               </h3>
-              <div className="flex gap-3">
-                href="https://instagram.com/viaa.tarot" target="_blank"
-                rel="noopener noreferrer" className="flex-1 py-3
-                bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400
-                hover:to-purple-400 text-white font-medium rounded-xl
-                transition-all text-center"
-                <a>Instagram</a>
-                href="https://tiktok.com/@viaa.tarot" target="_blank"
-                rel="noopener noreferrer" className="flex-1 py-3 bg-black
-                hover:bg-gray-800 text-white font-medium rounded-xl
-                transition-all text-center"
-                <a>TikTok</a>
-              </div>
+              <button
+                onClick={abrirInstagram}
+                className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white font-medium rounded-xl transition-all text-center cursor-pointer"
+              >
+                Instagram
+              </button>
             </div>
           </div>
         </div>
