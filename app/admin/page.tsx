@@ -531,6 +531,7 @@ export default function AdminPage() {
               icon: "💬",
               count: sessoesPendentes.length,
             },
+            { id: "promocoes", label: "Promoções", icon: "🎁", count: 0 },
             {
               id: "pagamentos",
               label: "Pagamentos",
