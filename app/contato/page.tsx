@@ -134,8 +134,8 @@ export default function ContatoPage() {
                   <option value="Suporte técnico" className="bg-purple-900">
                     Suporte técnico
                   </option>
-                  <option value="Quero ser taróloga" className="bg-purple-900">
-                    Quero ser taróloga
+                  <option value="Quero ser tarólogo" className="bg-purple-900">
+                    Quero ser tarólogo
                   </option>
                   <option value="Parcerias" className="bg-purple-900">
                     Parcerias

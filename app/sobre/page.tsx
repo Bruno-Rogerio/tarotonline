@@ -15,7 +15,7 @@ export default function SobrePage() {
   // Número do WhatsApp para tarólogas
   const numeroWhatsApp = "5511995391337"; // ALTERE PARA O NÚMERO REAL
   const mensagemTarologa =
-    "Olá! Sou taróloga e gostaria de saber mais sobre como fazer parte da plataforma Viaa Tarot.";
+    "Olá! Sou tarólogo e gostaria de saber mais sobre como fazer parte da plataforma Viaa Tarot.";
   const linkWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(
     mensagemTarologa
   )}`;
@@ -90,7 +90,7 @@ export default function SobrePage() {
                 pessoa.
               </p>
               <p>
-                Reunimos tarólogas sensíveis, éticas e comprometidas, oferecendo
+                Reunimos tarólogos sensíveis, éticos e comprometidos, oferecendo
                 um{" "}
                 <span className="text-purple-300 font-medium">
                   espaço seguro, confidencial e humanizado
@@ -198,12 +198,12 @@ export default function SobrePage() {
                   🌟
                 </div>
                 <h2 className="text-2xl md:text-3xl font-bold text-white">
-                  Para Tarólogas
+                  Para Tarólogos
                 </h2>
               </div>
 
               <p className="text-purple-100/80 text-base md:text-lg leading-relaxed mb-8">
-                Se você é taróloga e deseja fazer parte da nossa plataforma,
+                Se você é tarólogo e deseja fazer parte da nossa plataforma,
                 acreditando em uma atuação ética, responsável e comprometida com
                 o cuidado emocional das pessoas, entre em contato conosco para
                 saber mais sobre o cadastro.
