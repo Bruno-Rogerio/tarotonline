@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import TimerMistico from "@/components/Timermistico";
 import { getImagemCarta } from "@/lib/getImagemCarta";
+import { verificarBonusFidelidade } from "@/lib/fidelidade";
 
 type Mensagem = {
   id: string;
@@ -344,6 +345,7 @@ export default function ChatPage() {
 
     const minutosUsados = Math.ceil(tempoDecorrido / 60);
 
+    // 1. Atualizar status da sessão
     const { error } = await supabase
       .from("sessoes")
       .update({
@@ -357,7 +359,7 @@ export default function ChatPage() {
       console.error("❌ Erro ao finalizar:", error);
     }
 
-    // Atualizar minutos do usuário
+    // 2. Atualizar minutos do usuário
     const { data: u } = await supabase
       .from("usuarios")
       .select("minutos_disponiveis")
@@ -372,7 +374,7 @@ export default function ChatPage() {
         .eq("id", sessao.usuario_id);
     }
 
-    // ✅ NOVO: Incrementar contador de consultas do tarólogo
+    // 3. Incrementar contador de consultas do tarólogo
     const { data: tarologoData } = await supabase
       .from("tarologos")
       .select("total_consultas")
@@ -386,9 +388,32 @@ export default function ChatPage() {
         .eq("id", sessao.tarologo_id);
     }
 
+    // ✨ 4. NOVO: Verificar e aplicar bônus de fidelidade (apenas para o cliente)
+    if (!isAdmin && minutosUsados > 0) {
+      try {
+        const resultado = await verificarBonusFidelidade(
+          sessao.usuario_id,
+          minutosUsados
+        );
+
+        if (resultado.bonusAplicado) {
+          // Mostrar notificação de bônus após um pequeno delay
+          setTimeout(() => {
+            alert(
+              `🎁 Parabéns! Você ganhou ${resultado.minutosGanhos} minutos de bônus por fidelidade!`
+            );
+          }, 500);
+        }
+      } catch (err) {
+        console.error("Erro ao verificar bônus de fidelidade:", err);
+        // Não bloqueia o fluxo se falhar
+      }
+    }
+
+    // 5. Mostrar mensagem de finalização
     alert(`⏰ Consulta finalizada! Tempo usado: ${minutosUsados} minutos`);
 
-    // ✅ MODIFICADO: Redirecionar cliente para avaliação, admin para home
+    // 6. Redirecionar: cliente vai para avaliação, admin vai para home
     setTimeout(() => {
       if (isAdmin) {
         router.push("/");
