@@ -270,9 +270,14 @@ export default function ChatPage() {
 
             alert("⏰ Consulta finalizada!");
 
-            // Redirecionar ambos os usuários
+            // Redirecionar: cliente vai para avaliação, admin vai para home
             setTimeout(() => {
-              router.push("/");
+              const souAdmin = sessaoRef.current?.admin_id === usuarioId;
+              if (souAdmin) {
+                router.push("/");
+              } else {
+                router.push(`/avaliar/${sessaoId}`);
+              }
               router.refresh();
             }, 2000);
           }
