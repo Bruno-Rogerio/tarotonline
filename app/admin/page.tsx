@@ -192,10 +192,13 @@ export default function AdminPage() {
         .channel("admin-updates")
         .on(
           "postgres_changes",
-          { event: "INSERT", schema: "public", table: "sessoes" },
+          { event: "*", schema: "public", table: "sessoes" },
           (payload) => {
+            console.log("[realtime] sessoes:", payload);
+
             const novaSessao = payload.new as any;
 
+            // notifica quando status ficar "aguardando"
             if (novaSessao?.status === "aguardando") {
               carregarSessoesPendentes();
               mostrarAlertaNovaAtividade();
@@ -210,11 +213,13 @@ export default function AdminPage() {
         )
         .on(
           "postgres_changes",
-          { event: "INSERT", schema: "public", table: "compras" },
+          { event: "*", schema: "public", table: "compras" },
           (payload) => {
+            console.log("[realtime] compras:", payload);
+
             const novaCompra = payload.new as any;
 
-            // notifica só quando for "pendente"
+            // notifica quando status ficar "pendente"
             if (novaCompra?.status === "pendente") {
               carregarComprasPendentes();
               mostrarAlertaNovaAtividade();
@@ -223,12 +228,14 @@ export default function AdminPage() {
                 "💳 Pagamento pendente",
                 "Entrou um novo pagamento para aprovação."
               );
-
               playSound();
             }
           }
         )
-        .subscribe();
+        .subscribe((status, err) => {
+          console.log("[realtime] admin-updates:", status);
+          if (err) console.error("[realtime] admin-updates error:", err);
+        });
 
       setLoading(false);
     };
