@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { trackWhatsAppClick } from "@/lib/analytics";
 
 export default function WhatsAppButton() {
   const [mostrarTooltip, setMostrarTooltip] = useState(false);
@@ -12,6 +13,12 @@ export default function WhatsAppButton() {
   const linkWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(
     mensagemPadrao
   )}`;
+
+  const handleClick = () => {
+    // Dispara evento no GA4
+    trackWhatsAppClick();
+    // O link continua abrindo normalmente (target=_blank)
+  };
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -28,6 +35,7 @@ export default function WhatsAppButton() {
         href={linkWhatsApp}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={handleClick}
         onMouseEnter={() => setMostrarTooltip(true)}
         onMouseLeave={() => setMostrarTooltip(false)}
         className="group flex items-center justify-center w-14 h-14 bg-green-500 hover:bg-green-600 rounded-full shadow-lg shadow-green-500/30 hover:shadow-green-500/50 hover:scale-110 transition-all duration-300"

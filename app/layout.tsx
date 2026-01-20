@@ -14,6 +14,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+
 export const metadata: Metadata = {
   title: "Viaa Tarot",
   description: "Consulte nossos tarólogos especializados online",
@@ -30,21 +32,25 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <head>
-        {/* Google Analytics */}
-        <Script
-          strategy="afterInteractive"
-          src="https://www.googletagmanager.com/gtag/js?id=G-D7R0TKRBFG"
-        />
-        <Script id="ga-init" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-D7R0TKRBFG', {
-              anonymize_ip: true
-            });
-          `}
-        </Script>
+        {GA_ID && (
+          <>
+            {/* Google Analytics */}
+            <Script
+              strategy="afterInteractive"
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+            />
+            <Script id="ga-init" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${GA_ID}', {
+                  anonymize_ip: true
+                });
+              `}
+            </Script>
+          </>
+        )}
       </head>
 
       <body
