@@ -22,7 +22,7 @@ export default function ContatoPage() {
   }
 
   function enviarEmail() {
-    const emailDestino = "contato@viaa.app.br";
+    const emailDestino = "viaatarot@gmail.com";
     const assuntoEmail = encodeURIComponent(assunto || "Contato via site");
     const corpoEmail = encodeURIComponent(
       `Nome: ${nome}\nE-mail: ${email}\n\nMensagem:\n${mensagem}`
@@ -213,7 +213,7 @@ export default function ContatoPage() {
                   </p>
                 </div>
               </div>
-              <p className="text-white/80 mb-2">contato@viaa.app.br</p>
+              <p className="text-white/80 mb-2">viaatarot@gmail.com</p>
               <p className="text-white/60 text-sm">
                 Responderemos em até 24 horas úteis.
               </p>
