@@ -636,19 +636,19 @@ export default function HomeContent({
                 Sobre
               </Link>
               <a
-                href="#"
+                href="/termos"
                 className="text-purple-300/70 hover:text-white transition-colors"
               >
                 Termos
               </a>
               <a
-                href="#"
+                href="/privacidade"
                 className="text-purple-300/70 hover:text-white transition-colors"
               >
                 Privacidade
               </a>
               <a
-                href="#"
+                href="/contato"
                 className="text-purple-300/70 hover:text-white transition-colors"
               >
                 Contato
