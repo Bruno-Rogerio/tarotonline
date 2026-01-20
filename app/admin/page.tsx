@@ -1,3 +1,4 @@
+// app/admin/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -652,6 +653,15 @@ export default function AdminPage() {
                 </button>
               )}
 
+              {/* Link Cupons no Header */}
+              <Link
+                href="/admin/cupons"
+                className="text-pink-400 hover:text-pink-300 text-sm hidden sm:flex items-center gap-1 px-3 py-1.5 bg-pink-500/10 rounded-lg border border-pink-500/30 hover:bg-pink-500/20 transition-all"
+              >
+                <span>🎟️</span>
+                <span>Cupons</span>
+              </Link>
+
               {/* Link Promoções no Header */}
               <Link
                 href="/admin/promocoes"
@@ -860,12 +870,41 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* ✨ SEÇÃO DE ACESSO RÁPIDO - PROMOÇÕES ✨ */}
+            {/* ✨ SEÇÃO DE ACESSO RÁPIDO ✨ */}
             <div>
               <h3 className="text-white/80 font-medium mb-3 flex items-center gap-2">
                 <span>⚡</span> Acesso Rápido
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Card Cupons */}
+                <Link
+                  href="/admin/cupons"
+                  className="group bg-gradient-to-br from-pink-500/20 to-purple-500/20 backdrop-blur-sm rounded-2xl p-5 border border-pink-500/30 hover:border-pink-400/60 transition-all hover:shadow-lg hover:shadow-pink-500/10 hover:scale-[1.02]"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-purple-500 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-lg shadow-pink-500/30">
+                      🎟️
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-bold text-lg">
+                        Cupons de Desconto
+                      </h4>
+                      <p className="text-white/60 text-sm">
+                        Criar e gerenciar cupons
+                      </p>
+                    </div>
+                    <span className="text-pink-400 group-hover:translate-x-1 transition-transform">
+                      →
+                    </span>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-pink-500/20">
+                    <p className="text-pink-300/80 text-sm">
+                      🎯 Crie cupons de % OFF, R$ OFF ou minutos extras para
+                      campanhas
+                    </p>
+                  </div>
+                </Link>
+
                 {/* Card Promoções */}
                 <Link
                   href="/admin/promocoes"
@@ -895,7 +934,7 @@ export default function AdminPage() {
                   </div>
                 </Link>
 
-                {/* Card Histórico (placeholder futuro) */}
+                {/* Card Relatórios (placeholder futuro) */}
                 <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-5 border border-white/10 opacity-60">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl">
@@ -904,21 +943,6 @@ export default function AdminPage() {
                     <div className="flex-1">
                       <h4 className="text-white/70 font-bold text-lg">
                         Relatórios
-                      </h4>
-                      <p className="text-white/40 text-sm">Em breve</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card Configurações (placeholder futuro) */}
-                <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-5 border border-white/10 opacity-60">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl">
-                      ⚙️
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-white/70 font-bold text-lg">
-                        Configurações
                       </h4>
                       <p className="text-white/40 text-sm">Em breve</p>
                     </div>
