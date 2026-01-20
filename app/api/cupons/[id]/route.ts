@@ -10,10 +10,10 @@ const supabaseAdmin = createClient(
 // GET - Buscar cupom por ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const { data, error } = await supabaseAdmin
       .from("cupons")
@@ -31,10 +31,12 @@ export async function GET(
     // Buscar histórico de uso
     const { data: usos } = await supabaseAdmin
       .from("cupons_uso")
-      .select(`
+      .select(
+        `
         *,
         usuario:usuarios(id, nome, telefone)
-      `)
+      `
+      )
       .eq("cupom_id", id)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -55,10 +57,10 @@ export async function GET(
 // PUT - Atualizar cupom
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
 
     // Não permitir alterar código se já tiver usos
@@ -69,7 +71,11 @@ export async function PUT(
         .eq("id", id)
         .single();
 
-      if (cupomAtual && cupomAtual.total_usos > 0 && body.codigo !== cupomAtual.codigo) {
+      if (
+        cupomAtual &&
+        cupomAtual.total_usos > 0 &&
+        body.codigo !== cupomAtual.codigo
+      ) {
         return NextResponse.json(
           { error: "Não é possível alterar o código de um cupom já utilizado" },
           { status: 400 }
@@ -151,10 +157,10 @@ export async function PUT(
 // DELETE - Excluir cupom (apenas se não tiver usos)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Verificar se cupom tem usos
     const { data: cupom } = await supabaseAdmin
@@ -165,15 +171,15 @@ export async function DELETE(
 
     if (cupom && cupom.total_usos > 0) {
       return NextResponse.json(
-        { error: "Não é possível excluir um cupom já utilizado. Desative-o em vez disso." },
+        {
+          error:
+            "Não é possível excluir um cupom já utilizado. Desative-o em vez disso.",
+        },
         { status: 400 }
       );
     }
 
-    const { error } = await supabaseAdmin
-      .from("cupons")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabaseAdmin.from("cupons").delete().eq("id", id);
 
     if (error) {
       console.error("Erro ao excluir cupom:", error);
