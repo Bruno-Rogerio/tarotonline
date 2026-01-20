@@ -261,18 +261,24 @@ export default function ComprarMinutosPage() {
           <span className="relative flex items-center justify-center gap-2">
             <span>💳</span>
             <span>
-              {processando ? "Redirecionando..." : "Pagar com cartão"}
+              {processando ? "Redirecionando..." : "Continuar para pagamento"}
             </span>
             <span>→</span>
           </span>
         </button>
 
         {/* Métodos de pagamento */}
-        <div className="flex items-center justify-center gap-4 mt-6 text-white/40 text-sm">
-          <span>Pagamento seguro via</span>
-          <div className="flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full">
-            <span className="text-purple-400">💳</span>
-            <span className="text-white font-medium">Stripe</span>
+        <div className="flex flex-col items-center gap-2 mt-6">
+          <span className="text-white/40 text-sm">Pagamento seguro via</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-full">
+              <span>💳</span>
+              <span className="text-white/80 text-sm">Cartão</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-full">
+              <span>💠</span>
+              <span className="text-white/80 text-sm">PIX</span>
+            </div>
           </div>
         </div>
 
