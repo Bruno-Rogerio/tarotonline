@@ -6,6 +6,7 @@ import TarologoCard from "./TarologoCard";
 import HeaderLogado from "./HeaderLogado";
 import Link from "next/link";
 import RegistrarAcesso from "./RegistrarAcesso";
+import ProgressoFidelidade from "./ProgressoFidelidade";
 
 type Tarologo = {
   id: string;
@@ -446,6 +447,12 @@ export default function HomeContent({
                   <span>Ver tarológos</span>
                 </span>
               </Link>
+            </div>
+          )}
+
+          {usuario && (
+            <div className="container mx-auto px-4 py-4">
+              <ProgressoFidelidade usuarioId={usuario.id} />
             </div>
           )}
 
