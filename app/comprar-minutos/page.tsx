@@ -1,9 +1,11 @@
+// app/comprar-minutos/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import CupomInput from "@/components/CupomInput";
 
 export default function ComprarMinutosPage() {
   const [usuario, setUsuario] = useState<any>(null);
@@ -14,6 +16,11 @@ export default function ComprarMinutosPage() {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [copiado, setCopiado] = useState(false);
   const router = useRouter();
+
+  // Estados do Cupom
+  const [cupomAplicado, setCupomAplicado] = useState<any>(null);
+  const [descontoCupom, setDescontoCupom] = useState(0);
+  const [minutosExtrasCupom, setMinutosExtrasCupom] = useState(0);
 
   const PRECO_POR_MINUTO = 1.99;
 
@@ -31,15 +38,18 @@ export default function ComprarMinutosPage() {
     { minutos: 60, desconto: 15, popular: false },
   ];
 
-  // Calcular valor com desconto aplicado
+  // Calcular valor com desconto do pacote
   const pacoteSelecionado = pacotes.find(
     (p) => p.minutos === minutosEscolhidos
   );
   const descontoAtual = pacoteSelecionado?.desconto || 0;
   const valorOriginal = minutosEscolhidos * PRECO_POR_MINUTO;
-  const valorComDesconto =
+  const valorComDescontoPacote =
     valorOriginal - (valorOriginal * descontoAtual) / 100;
-  const valorTotal = valorComDesconto.toFixed(2);
+
+  // Valor final com desconto do cupom
+  const valorFinal = Math.max(0, valorComDescontoPacote - descontoCupom);
+  const valorTotal = valorFinal.toFixed(2);
 
   useEffect(() => {
     verificarUsuario();
@@ -49,7 +59,7 @@ export default function ComprarMinutosPage() {
     if (mostrarPix) {
       gerarQRCode();
     }
-  }, [mostrarPix, minutosEscolhidos]);
+  }, [mostrarPix, minutosEscolhidos, descontoCupom]);
 
   async function verificarUsuario() {
     const {
@@ -71,6 +81,17 @@ export default function ComprarMinutosPage() {
     setLoading(false);
   }
 
+  // Callback do cupom
+  function handleCupomAplicado(
+    cupom: any,
+    desconto: number,
+    minutosExtras: number
+  ) {
+    setCupomAplicado(cupom);
+    setDescontoCupom(desconto);
+    setMinutosExtrasCupom(minutosExtras);
+  }
+
   // Função para Stripe Checkout
   async function handleCheckoutStripe() {
     if (!usuario) return;
@@ -82,9 +103,13 @@ export default function ComprarMinutosPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          minutos: minutosEscolhidos,
+          minutos: minutosEscolhidos + minutosExtrasCupom,
           usuarioId: usuario.id,
           email: usuario.email || "",
+          cupomId: cupomAplicado?.id || null,
+          descontoCupom: descontoCupom,
+          minutosExtrasCupom: minutosExtrasCupom,
+          valorOriginal: valorComDescontoPacote,
         }),
       });
 
@@ -182,18 +207,50 @@ export default function ComprarMinutosPage() {
 
     setProcessando(true);
 
-    const { error } = await supabase.from("compras").insert({
-      usuario_id: usuario.id,
-      minutos: minutosEscolhidos,
-      valor: parseFloat(valorTotal),
-      status: "pendente",
-      pix_codigo: gerarCodigoPix(),
-    });
+    // Criar compra com dados do cupom
+    const { data: compra, error } = await supabase
+      .from("compras")
+      .insert({
+        usuario_id: usuario.id,
+        minutos: minutosEscolhidos + minutosExtrasCupom,
+        valor: parseFloat(valorTotal),
+        status: "pendente",
+        pix_codigo: gerarCodigoPix(),
+        cupom_id: cupomAplicado?.id || null,
+        desconto_aplicado: descontoCupom,
+        minutos_bonus: minutosExtrasCupom,
+      })
+      .select()
+      .single();
 
     if (error) {
       alert("Erro ao registrar compra");
       setProcessando(false);
       return;
+    }
+
+    // Se tem cupom, registrar uso
+    if (cupomAplicado && compra) {
+      await supabase.from("cupons_uso").insert({
+        cupom_id: cupomAplicado.id,
+        usuario_id: usuario.id,
+        compra_id: compra.id,
+        valor_original: valorComDescontoPacote,
+        valor_desconto: descontoCupom,
+        valor_final: parseFloat(valorTotal),
+        minutos_extras: minutosExtrasCupom,
+      });
+
+      // Atualizar estatísticas do cupom
+      await supabase.rpc("aplicar_cupom", {
+        p_cupom_id: cupomAplicado.id,
+        p_usuario_id: usuario.id,
+        p_compra_id: compra.id,
+        p_valor_original: valorComDescontoPacote,
+        p_valor_desconto: descontoCupom,
+        p_valor_final: parseFloat(valorTotal),
+        p_minutos_extras: minutosExtrasCupom,
+      });
     }
 
     alert(
@@ -270,9 +327,24 @@ export default function ComprarMinutosPage() {
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full">
                 <span className="text-purple-300">⏱️</span>
                 <span className="text-white/80 text-sm">
-                  {minutosEscolhidos} minutos de consulta
+                  {minutosEscolhidos + minutosExtrasCupom} minutos de consulta
+                  {minutosExtrasCupom > 0 && (
+                    <span className="text-green-400 ml-1">
+                      (+{minutosExtrasCupom} bônus)
+                    </span>
+                  )}
                 </span>
               </div>
+
+              {/* Info do cupom aplicado */}
+              {cupomAplicado && (
+                <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full">
+                  <span>🎟️</span>
+                  <span className="text-green-300 text-sm font-medium">
+                    Cupom {cupomAplicado.codigo} aplicado!
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -454,6 +526,24 @@ export default function ComprarMinutosPage() {
           })}
         </div>
 
+        {/* Cupom de Desconto */}
+        <div className="mb-6">
+          <CupomInput
+            usuarioId={usuario?.id || ""}
+            valorCompra={valorComDescontoPacote}
+            onCupomAplicado={handleCupomAplicado}
+          />
+        </div>
+
+        {/* Aviso sobre fidelidade */}
+        {cupomAplicado && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 mb-6">
+            <p className="text-yellow-200/80 text-sm text-center">
+              ⚠️ Cupom não acumula com programa de fidelidade
+            </p>
+          </div>
+        )}
+
         {/* Resumo */}
         <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm rounded-2xl p-5 md:p-6 border border-white/20 mb-6">
           <div className="space-y-3">
@@ -461,6 +551,11 @@ export default function ComprarMinutosPage() {
               <span className="text-white/70">Minutos selecionados</span>
               <span className="text-white font-bold text-lg">
                 {minutosEscolhidos} min
+                {minutosExtrasCupom > 0 && (
+                  <span className="text-green-400 text-sm ml-1">
+                    +{minutosExtrasCupom}
+                  </span>
+                )}
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -470,16 +565,42 @@ export default function ComprarMinutosPage() {
               </span>
             </div>
 
+            {/* Desconto do pacote */}
             {descontoAtual > 0 && (
+              <div className="flex justify-between items-center text-purple-300">
+                <span>Desconto pacote ({descontoAtual}%)</span>
+                <span className="font-medium">
+                  - R$ {((valorOriginal * descontoAtual) / 100).toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            {/* Desconto do cupom (valor) */}
+            {cupomAplicado && descontoCupom > 0 && (
               <div className="flex justify-between items-center text-green-400">
-                <span>Desconto aplicado</span>
-                <span className="font-medium">-{descontoAtual}%</span>
+                <span>🎟️ Cupom {cupomAplicado.codigo}</span>
+                <span className="font-bold">
+                  - R$ {descontoCupom.toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            {/* Cupom de minutos extras */}
+            {cupomAplicado && minutosExtrasCupom > 0 && (
+              <div className="flex justify-between items-center text-green-400">
+                <span>🎟️ Cupom {cupomAplicado.codigo}</span>
+                <span className="font-bold">+{minutosExtrasCupom} minutos</span>
               </div>
             )}
 
             <div className="border-t border-white/20 pt-3 flex justify-between items-center">
               <span className="text-white font-medium">Total</span>
               <div className="text-right">
+                {(descontoCupom > 0 || descontoAtual > 0) && (
+                  <div className="text-white/40 text-sm line-through">
+                    R$ {valorOriginal.toFixed(2)}
+                  </div>
+                )}
                 <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
                   R$ {valorTotal}
                 </div>
