@@ -58,6 +58,57 @@ type EstatisticasAcesso = {
   estadosMaisAcessam: { estado: string; total: number }[];
 };
 
+function canUseNotifications() {
+  return typeof window !== "undefined" && "Notification" in window;
+}
+
+async function ensureNotificationPermission() {
+  if (!canUseNotifications()) return "unsupported" as const;
+
+  if (Notification.permission === "granted") return "granted" as const;
+  if (Notification.permission === "denied") return "denied" as const;
+
+  // "default" -> pede permissão
+  const permission = await Notification.requestPermission();
+  return permission as "granted" | "denied" | "default";
+}
+
+function notifyBrowser(title: string, body: string) {
+  if (!canUseNotifications()) return;
+
+  if (Notification.permission !== "granted") return;
+
+  // Evita spam quando a aba está ativa (opcional)
+  const shouldNotify = document.visibilityState !== "visible";
+
+  if (!shouldNotify) return;
+
+  try {
+    const n = new Notification(title, {
+      body,
+      icon: "/logo.png",
+      badge: "/logo.png",
+    });
+
+    // Foco ao clicar
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
+  } catch (e) {
+    // alguns browsers podem bloquear em situações específicas
+    console.warn("Notification falhou:", e);
+  }
+}
+
+function playSound() {
+  try {
+    const audio = new Audio("/sounds/notify.mp3");
+    audio.volume = 0.8;
+    audio.play().catch(() => {});
+  } catch {}
+}
+
 export default function AdminPage() {
   const [abaAtiva, setAbaAtiva] = useState<
     "dashboard" | "consultas" | "pagamentos" | "usuarios"
@@ -91,9 +142,104 @@ export default function AdminPage() {
   const [novaAtividade, setNovaAtividade] = useState(false);
   const router = useRouter();
 
+  const [notifStatus, setNotifStatus] = useState<
+    "unknown" | "unsupported" | "default" | "granted" | "denied"
+  >("unknown");
+
   useEffect(() => {
-    verificarAdmin();
+    if (!canUseNotifications()) {
+      setNotifStatus("unsupported");
+      return;
+    }
+    setNotifStatus(Notification.permission as any);
   }, []);
+
+  useEffect(() => {
+    let channel: any;
+    let isMounted = true;
+
+    const init = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      const { data: userData } = await supabase
+        .from("usuarios")
+        .select("tipo")
+        .eq("id", user.id)
+        .single();
+
+      if (!userData || userData.tipo !== "admin") {
+        alert("Apenas admins podem acessar.");
+        router.push("/");
+        return;
+      }
+
+      if (!isMounted) return;
+
+      setAdminId(user.id);
+      await carregarDados();
+
+      // Pede permissão uma vez ao abrir o admin
+      await ensureNotificationPermission();
+
+      channel = supabase
+        .channel("admin-updates")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "sessoes" },
+          (payload) => {
+            const novaSessao = payload.new as any;
+
+            if (novaSessao?.status === "aguardando") {
+              carregarSessoesPendentes();
+              mostrarAlertaNovaAtividade();
+
+              notifyBrowser(
+                "🔔 Nova consulta aguardando",
+                "Entrou uma nova solicitação de consulta."
+              );
+              playSound();
+            }
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "compras" },
+          (payload) => {
+            const novaCompra = payload.new as any;
+
+            // notifica só quando for "pendente"
+            if (novaCompra?.status === "pendente") {
+              carregarComprasPendentes();
+              mostrarAlertaNovaAtividade();
+
+              notifyBrowser(
+                "💳 Pagamento pendente",
+                "Entrou um novo pagamento para aprovação."
+              );
+
+              playSound();
+            }
+          }
+        )
+        .subscribe();
+
+      setLoading(false);
+    };
+
+    init();
+
+    return () => {
+      isMounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [router]);
 
   useEffect(() => {
     if (busca) {
@@ -117,69 +263,33 @@ export default function AdminPage() {
     }
   }, [sessoesPendentes.length, comprasPendentes.length]);
 
-  async function verificarAdmin() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    const { data: userData } = await supabase
-      .from("usuarios")
-      .select("tipo")
-      .eq("id", user.id)
-      .single();
-
-    if (!userData || userData.tipo !== "admin") {
-      alert("Apenas admins podem acessar.");
-      router.push("/");
-      return;
-    }
-
-    setAdminId(user.id);
-    await carregarDados();
-
-    const channel = supabase
-      .channel("admin-updates")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "sessoes",
-        },
-        () => {
-          carregarSessoesPendentes();
-          mostrarAlertaNovaAtividade();
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "compras",
-        },
-        () => {
-          carregarComprasPendentes();
-          mostrarAlertaNovaAtividade();
-        }
-      )
-      .subscribe();
-
-    setLoading(false);
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }
-
   function mostrarAlertaNovaAtividade() {
     setNovaAtividade(true);
     setTimeout(() => setNovaAtividade(false), 5000);
+  }
+  async function ativarNotificacoes() {
+    const permission = await ensureNotificationPermission();
+    setNotifStatus(permission);
+
+    if (permission === "unsupported") {
+      alert("Este navegador não suporta notificações.");
+      return;
+    }
+
+    if (permission === "granted") {
+      try {
+        new Notification("✅ Notificações ativadas", {
+          body: "Você será avisada quando entrar consulta ou pagamento pendente.",
+          icon: "/logo.png",
+          badge: "/logo.png",
+        });
+        playSound();
+      } catch {}
+    } else if (permission === "denied") {
+      alert(
+        "As notificações estão bloqueadas no navegador. Você pode liberar nas configurações do site (ícone de cadeado na barra de endereço)."
+      );
+    }
   }
 
   async function carregarDados() {
@@ -499,6 +609,42 @@ export default function AdminPage() {
             </Link>
 
             <div className="flex items-center gap-2 md:gap-4">
+              {/* Notificações */}
+              {notifStatus !== "unsupported" && (
+                <button
+                  onClick={ativarNotificacoes}
+                  className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-sm ${
+                    notifStatus === "granted"
+                      ? "bg-green-500/10 border-green-500/30 text-green-300 hover:bg-green-500/20"
+                      : notifStatus === "denied"
+                      ? "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20"
+                      : "bg-white/10 border-white/20 text-white/70 hover:bg-white/20"
+                  }`}
+                  title={
+                    notifStatus === "granted"
+                      ? "Notificações ativas"
+                      : notifStatus === "denied"
+                      ? "Notificações bloqueadas no navegador"
+                      : "Ativar notificações"
+                  }
+                >
+                  <span>
+                    {notifStatus === "granted"
+                      ? "🔔"
+                      : notifStatus === "denied"
+                      ? "🔕"
+                      : "🔔"}
+                  </span>
+                  <span className="hidden md:inline">
+                    {notifStatus === "granted"
+                      ? "Notificações ativas"
+                      : notifStatus === "denied"
+                      ? "Bloqueadas"
+                      : "Ativar notificações"}
+                  </span>
+                </button>
+              )}
+
               {/* Link Promoções no Header */}
               <Link
                 href="/admin/promocoes"
