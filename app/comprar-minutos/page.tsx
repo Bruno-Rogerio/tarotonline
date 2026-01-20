@@ -16,7 +16,6 @@ export default function ComprarMinutosPage() {
   const router = useRouter();
 
   const PRECO_POR_MINUTO = 1.99;
-  const valorTotal = (minutosEscolhidos * PRECO_POR_MINUTO).toFixed(2);
 
   // Dados PIX - do certificado MEI
   const CHAVE_PIX_CNPJ = "57129530000151";
@@ -31,7 +30,15 @@ export default function ComprarMinutosPage() {
     { minutos: 50, desconto: 12, popular: false },
     { minutos: 60, desconto: 15, popular: false },
   ];
-
+  // Calcular valor com desconto aplicado
+  const pacoteSelecionado = pacotes.find(
+    (p) => p.minutos === minutosEscolhidos
+  );
+  const descontoAtual = pacoteSelecionado?.desconto || 0;
+  const valorOriginal = minutosEscolhidos * PRECO_POR_MINUTO;
+  const valorComDesconto =
+    valorOriginal - (valorOriginal * descontoAtual) / 100;
+  const valorTotal = valorComDesconto.toFixed(2);
   useEffect(() => {
     verificarUsuario();
   }, []);
