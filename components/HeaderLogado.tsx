@@ -37,7 +37,7 @@ export default function HeaderLogado({ usuario }: { usuario: Usuario }) {
                 className="w-8 h-8 group-hover:scale-110 transition-transform"
               />
               <span className="text-lg font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
-                Tarot Místico
+                Viaa Tarot
               </span>
             </Link>
 
@@ -128,6 +128,15 @@ export default function HeaderLogado({ usuario }: { usuario: Usuario }) {
                 </Link>
               )}
 
+              {/* Link Histórico */}
+              <Link
+                href="/historico"
+                className="flex items-center gap-2 px-4 py-2 text-purple-300 hover:text-white hover:bg-white/10 rounded-full transition-all"
+              >
+                <span>📜</span>
+                <span>Histórico</span>
+              </Link>
+
               {/* Botão Admin */}
               {usuario.tipo === "admin" && (
                 <Link
@@ -154,7 +163,7 @@ export default function HeaderLogado({ usuario }: { usuario: Usuario }) {
         {/* Menu Mobile Dropdown */}
         <div
           className={`md:hidden overflow-hidden transition-all duration-300 ${
-            menuAberto ? "max-h-80 border-t border-purple-500/20" : "max-h-0"
+            menuAberto ? "max-h-96 border-t border-purple-500/20" : "max-h-0"
           }`}
         >
           <div className="container mx-auto px-4 py-4 space-y-3">
@@ -165,6 +174,15 @@ export default function HeaderLogado({ usuario }: { usuario: Usuario }) {
                 {usuario.nome} ✨
               </p>
             </div>
+
+            {/* Link Histórico */}
+            <Link
+              href="/historico"
+              onClick={() => setMenuAberto(false)}
+              className="flex items-center justify-center gap-2 w-full py-3 bg-purple-600/50 text-white font-semibold rounded-xl hover:bg-purple-600/70 transition-colors"
+            >
+              <span>📜</span> Meu Histórico
+            </Link>
 
             {/* Botão comprar minutos */}
             {usuario.minutos_disponiveis === 0 && (
