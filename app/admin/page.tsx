@@ -1,13 +1,9 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-("use client");
+"use client";
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 
 type Compra = {
   id: string;
@@ -149,20 +145,6 @@ export default function AdminPage() {
   const [notifStatus, setNotifStatus] = useState<
     "unknown" | "unsupported" | "default" | "granted" | "denied"
   >("unknown");
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    const tab = searchParams.get("tab");
-
-    if (
-      tab === "dashboard" ||
-      tab === "consultas" ||
-      tab === "pagamentos" ||
-      tab === "usuarios"
-    ) {
-      setAbaAtiva(tab);
-    }
-  }, [searchParams]);
 
   useEffect(() => {
     if (!canUseNotifications()) {
