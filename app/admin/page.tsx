@@ -194,7 +194,6 @@ export default function AdminPage() {
 
   async function carregarEstatisticasAcesso() {
     try {
-      // Acessos hoje
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
       const { count: acessosHoje } = await supabase
@@ -202,7 +201,6 @@ export default function AdminPage() {
         .select("*", { count: "exact", head: true })
         .gte("created_at", hoje.toISOString());
 
-      // Acessos última semana
       const semanaAtras = new Date();
       semanaAtras.setDate(semanaAtras.getDate() - 7);
       const { count: acessosSemana } = await supabase
@@ -210,12 +208,10 @@ export default function AdminPage() {
         .select("*", { count: "exact", head: true })
         .gte("created_at", semanaAtras.toISOString());
 
-      // Acessos total
       const { count: acessosTotal } = await supabase
         .from("acessos")
         .select("*", { count: "exact", head: true });
 
-      // Estados que mais acessam
       const { data: acessosPorEstado } = await supabase
         .from("acessos")
         .select("estado");
@@ -251,7 +247,7 @@ export default function AdminPage() {
     const { count: totalConsultas } = await supabase
       .from("sessoes")
       .select("*", { count: "exact", head: true })
-      .eq("status", "finalizada");
+      .in("status", ["em_andamento", "finalizada"]);
 
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
@@ -503,6 +499,14 @@ export default function AdminPage() {
             </Link>
 
             <div className="flex items-center gap-2 md:gap-4">
+              {/* Link Promoções no Header */}
+              <Link
+                href="/admin/promocoes"
+                className="text-yellow-400 hover:text-yellow-300 text-sm hidden sm:flex items-center gap-1 px-3 py-1.5 bg-yellow-500/10 rounded-lg border border-yellow-500/30 hover:bg-yellow-500/20 transition-all"
+              >
+                <span>🎁</span>
+                <span>Promoções</span>
+              </Link>
               <Link
                 href="/"
                 className="text-white/60 hover:text-white text-sm hidden sm:block"
@@ -531,7 +535,6 @@ export default function AdminPage() {
               icon: "💬",
               count: sessoesPendentes.length,
             },
-            { id: "promocoes", label: "Promoções", icon: "🎁", count: 0 },
             {
               id: "pagamentos",
               label: "Pagamentos",
@@ -638,63 +641,17 @@ export default function AdminPage() {
                   <div className="text-white/60 text-sm">Total de acessos</div>
                 </div>
 
-                {/* Top estado */}
                 <div className="bg-gradient-to-br from-violet-500/20 to-purple-500/20 backdrop-blur-sm rounded-2xl p-4 border border-violet-500/30">
                   <div className="text-3xl mb-2">📍</div>
                   <div className="text-2xl font-bold text-white">
                     {estatisticasAcesso.estadosMaisAcessam[0]?.estado || "-"}
                   </div>
-                  <div className="text-white/60 text-sm">
-                    Estado que mais acessa
-                  </div>
+                  <div className="text-white/60 text-sm">Estado top</div>
                 </div>
               </div>
             </div>
 
-            {/* Top 5 Estados */}
-            {estatisticasAcesso.estadosMaisAcessam.length > 0 && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                  <span>🗺️</span> Top 5 Estados
-                </h3>
-                <div className="space-y-3">
-                  {estatisticasAcesso.estadosMaisAcessam.map((item, index) => {
-                    const porcentagem =
-                      estatisticasAcesso.acessosTotal > 0
-                        ? (item.total / estatisticasAcesso.acessosTotal) * 100
-                        : 0;
-                    return (
-                      <div
-                        key={item.estado}
-                        className="flex items-center gap-3"
-                      >
-                        <span className="text-white/60 text-sm w-6">
-                          {index + 1}º
-                        </span>
-                        <div className="flex-1">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-white font-medium">
-                              {item.estado}
-                            </span>
-                            <span className="text-white/60 text-sm">
-                              {item.total} acessos
-                            </span>
-                          </div>
-                          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
-                              style={{ width: `${porcentagem}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Cards de estatísticas do negócio */}
+            {/* Cards de Estatísticas do Negócio */}
             <div>
               <h3 className="text-white/80 font-medium mb-3 flex items-center gap-2">
                 <span>💼</span> Estatísticas do Negócio
@@ -750,7 +707,74 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Ações rápidas */}
+            {/* ✨ SEÇÃO DE ACESSO RÁPIDO - PROMOÇÕES ✨ */}
+            <div>
+              <h3 className="text-white/80 font-medium mb-3 flex items-center gap-2">
+                <span>⚡</span> Acesso Rápido
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Card Promoções */}
+                <Link
+                  href="/admin/promocoes"
+                  className="group bg-gradient-to-br from-yellow-500/20 to-orange-500/20 backdrop-blur-sm rounded-2xl p-5 border border-yellow-500/30 hover:border-yellow-400/60 transition-all hover:shadow-lg hover:shadow-yellow-500/10 hover:scale-[1.02]"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-lg shadow-yellow-500/30">
+                      🎁
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-bold text-lg">
+                        Promoções & Fidelidade
+                      </h4>
+                      <p className="text-white/60 text-sm">
+                        Configure bônus automáticos
+                      </p>
+                    </div>
+                    <span className="text-yellow-400 group-hover:translate-x-1 transition-transform">
+                      →
+                    </span>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-yellow-500/20">
+                    <p className="text-yellow-300/80 text-sm">
+                      🎯 Recompense clientes fiéis com minutos de bônus
+                      automaticamente
+                    </p>
+                  </div>
+                </Link>
+
+                {/* Card Histórico (placeholder futuro) */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-5 border border-white/10 opacity-60">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl">
+                      📊
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white/70 font-bold text-lg">
+                        Relatórios
+                      </h4>
+                      <p className="text-white/40 text-sm">Em breve</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Configurações (placeholder futuro) */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-5 border border-white/10 opacity-60">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl">
+                      ⚙️
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white/70 font-bold text-lg">
+                        Configurações
+                      </h4>
+                      <p className="text-white/40 text-sm">Em breve</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Ações rápidas - Consultas e Pagamentos */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Consultas pendentes */}
               <div
@@ -786,8 +810,8 @@ export default function AdminPage() {
                           <p className="text-white font-medium text-sm">
                             {sessao.usuario.nome}
                           </p>
-                          <p className="text-white/50 text-xs">
-                            {sessao.usuario.minutos_disponiveis} min disponíveis
+                          <p className="text-purple-300 text-xs">
+                            → {sessao.tarologo.nome}
                           </p>
                         </div>
                         <button
@@ -814,7 +838,7 @@ export default function AdminPage() {
               <div
                 className={`bg-white/10 backdrop-blur-sm rounded-2xl p-5 border transition-all ${
                   comprasPendentes.length > 0
-                    ? "border-yellow-500/50 shadow-lg shadow-yellow-500/10"
+                    ? "border-green-500/50 shadow-lg shadow-green-500/10"
                     : "border-white/20"
                 }`}
               >
@@ -823,7 +847,7 @@ export default function AdminPage() {
                     <span>💳</span> Pagamentos Pendentes
                   </h3>
                   {comprasPendentes.length > 0 && (
-                    <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+                    <span className="bg-green-500 text-black text-xs font-bold px-2 py-1 rounded-full animate-pulse">
                       {comprasPendentes.length}
                     </span>
                   )}
@@ -882,7 +906,7 @@ export default function AdminPage() {
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center">
                 <div className="text-5xl mb-4">✅</div>
                 <div className="text-white text-lg">
-                  Nenhuma solicitação pendente
+                  Nenhuma consulta pendente
                 </div>
                 <p className="text-white/50 text-sm mt-2">
                   Novas solicitações aparecerão aqui automaticamente
@@ -893,7 +917,7 @@ export default function AdminPage() {
                 {sessoesPendentes.map((sessao) => (
                   <div
                     key={sessao.id}
-                    className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-yellow-500/30 hover:border-purple-500/30 transition-all shadow-lg shadow-yellow-500/5"
+                    className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-yellow-500/30 hover:border-purple-500/50 transition-all shadow-lg shadow-yellow-500/5"
                   >
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
@@ -906,13 +930,10 @@ export default function AdminPage() {
                         <p className="text-white/60 text-sm">
                           📱 {sessao.usuario.telefone}
                         </p>
-                        <div className="mt-2 inline-flex items-center gap-1.5 bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm">
-                          <span>⏱️</span>
-                          <span className="font-bold">
-                            {sessao.usuario.minutos_disponiveis} min
-                          </span>
-                          <span className="text-green-400/70">disponíveis</span>
-                        </div>
+                        <p className="text-green-400 text-sm mt-1">
+                          💰 {sessao.usuario.minutos_disponiveis} min
+                          disponíveis
+                        </p>
                       </div>
 
                       <div>
@@ -920,13 +941,19 @@ export default function AdminPage() {
                           Consulta
                         </h3>
                         <p className="text-white">
-                          Tarólogo:{" "}
-                          <span className="font-bold text-purple-300">
+                          <span className="text-white/60">Tarólogo: </span>
+                          <span className="font-bold">
                             {sessao.tarologo.nome}
                           </span>
                         </p>
+                        <p className="text-white">
+                          <span className="text-white/60">Duração: </span>
+                          <span className="font-bold">
+                            {sessao.minutos_comprados} minutos
+                          </span>
+                        </p>
                         <p className="text-white/50 text-sm mt-1">
-                          Solicitado em{" "}
+                          📅{" "}
                           {new Date(sessao.created_at).toLocaleString("pt-BR")}
                         </p>
                       </div>
@@ -994,13 +1021,20 @@ export default function AdminPage() {
                         <h3 className="text-purple-300 text-sm font-medium mb-2">
                           Compra
                         </h3>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-3xl font-bold text-green-400">
+                        <p className="text-white">
+                          <span className="text-white/60">Minutos: </span>
+                          <span className="font-bold text-purple-300">
+                            {compra.minutos} min
+                          </span>
+                        </p>
+                        <p className="text-white">
+                          <span className="text-white/60">Valor: </span>
+                          <span className="font-bold text-green-400">
                             R$ {compra.valor.toFixed(2)}
                           </span>
-                        </div>
-                        <p className="text-white/70 text-sm mt-1">
-                          {compra.minutos} minutos •{" "}
+                        </p>
+                        <p className="text-white/50 text-sm mt-1">
+                          📅{" "}
                           {new Date(compra.created_at).toLocaleString("pt-BR")}
                         </p>
                       </div>
@@ -1069,30 +1103,38 @@ export default function AdminPage() {
                       key={usuario.id}
                       className="p-4 hover:bg-white/5 transition-colors"
                     >
-                      <div className="md:hidden space-y-3">
-                        <div className="flex items-center justify-between">
+                      {/* Mobile */}
+                      <div className="md:hidden">
+                        <div className="flex items-center justify-between mb-2">
                           <div>
                             <p className="text-white font-medium">
                               {usuario.nome}
                             </p>
-                            <p className="text-white/50 text-sm">
+                            <p className="text-white/60 text-sm">
                               {usuario.telefone}
                             </p>
                           </div>
-                          <div className="text-right">
-                            <span className="inline-flex items-center gap-1 bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full text-sm font-medium">
-                              ⏱️ {usuario.minutos_disponiveis} min
-                            </span>
-                          </div>
+                          <span className="inline-flex items-center gap-1 bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full text-sm font-medium">
+                            ⏱️ {usuario.minutos_disponiveis} min
+                          </span>
                         </div>
-                        <button
-                          onClick={() => setModalCreditos(usuario)}
-                          className="w-full py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium rounded-lg text-sm"
-                        >
-                          💎 Dar Créditos
-                        </button>
+                        <div className="flex items-center justify-between mt-3">
+                          <span className="text-white/50 text-xs">
+                            Cadastro:{" "}
+                            {new Date(usuario.created_at).toLocaleDateString(
+                              "pt-BR"
+                            )}
+                          </span>
+                          <button
+                            onClick={() => setModalCreditos(usuario)}
+                            className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium rounded-lg text-sm"
+                          >
+                            💎 Dar Créditos
+                          </button>
+                        </div>
                       </div>
 
+                      {/* Desktop */}
                       <div className="hidden md:grid grid-cols-5 gap-4 items-center">
                         <div className="text-white font-medium">
                           {usuario.nome}

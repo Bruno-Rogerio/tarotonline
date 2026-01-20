@@ -35,7 +35,7 @@ export default function ContatoPage() {
   }
 
   function abrirInstagram() {
-    window.open("https://instagram.com/viaa.tarot", "_blank");
+    window.open("https://instagram.com/viaa_tarot", "_blank");
   }
 
   return (
