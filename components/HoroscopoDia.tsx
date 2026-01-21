@@ -378,8 +378,12 @@ export default function HoroscopoDia() {
 
               {/* Botão fechar */}
               <button
-                onClick={fecharModal}
-                className="w-full mt-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-xl transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fecharModal();
+                }}
+                className="absolute top-4 right-4 w-8 h-8 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center text-white transition-all z-10"
+                aria-label="Fechar"
               >
                 Fechar
               </button>
