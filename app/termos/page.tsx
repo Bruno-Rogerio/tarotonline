@@ -1,6 +1,27 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Termos de Uso | Viaa Tarot",
+  description:
+    "Leia os Termos de Uso da Viaa Tarot: regras de cadastro, pagamentos, natureza das consultas, conduta do usuário e demais condições.",
+  alternates: {
+    canonical: "https://SEU-DOMINIO.com/termos",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    title: "Termos de Uso | Viaa Tarot",
+    description:
+      "Confira as condições de uso da plataforma Viaa Tarot, incluindo regras de cadastro, pagamentos e conduta.",
+    url: "https://SEU-DOMINIO.com/termos",
+    siteName: "Viaa Tarot",
+    locale: "pt_BR",
+    type: "website",
+  },
+};
 
 export default function TermosPage() {
   return (

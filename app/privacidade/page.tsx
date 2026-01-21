@@ -1,6 +1,27 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Política de Privacidade | Viaa Tarot",
+  description:
+    "Entenda como a Viaa Tarot coleta, usa, armazena e protege dados pessoais. Informações sobre LGPD, cookies, retenção de dados e seus direitos.",
+  alternates: {
+    canonical: "https://SEU-DOMINIO.com/privacidade",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    title: "Política de Privacidade | Viaa Tarot",
+    description:
+      "Veja como a Viaa Tarot protege seus dados, quais informações são coletadas e quais são seus direitos pela LGPD.",
+    url: "https://SEU-DOMINIO.com/privacidade",
+    siteName: "Viaa Tarot",
+    locale: "pt_BR",
+    type: "website",
+  },
+};
 
 export default function PrivacidadePage() {
   return (
