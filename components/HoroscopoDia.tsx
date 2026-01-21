@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
 type Horoscopo = {
@@ -90,7 +90,6 @@ export default function HoroscopoDia() {
   const [horoscopos, setHoroscopos] = useState<Horoscopo[]>([]);
   const [signoSelecionado, setSignoSelecionado] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const carrosselRef = useRef<HTMLDivElement>(null);
 
   // Data de hoje formatada
   const hoje = new Date();
@@ -131,16 +130,6 @@ export default function HoroscopoDia() {
   function fecharModal() {
     setSignoSelecionado(null);
     document.body.style.overflow = "auto";
-  }
-
-  // Scroll do carrossel
-  function scrollCarrossel(direcao: "left" | "right") {
-    if (!carrosselRef.current) return;
-    const scrollAmount = 200;
-    carrosselRef.current.scrollBy({
-      left: direcao === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
-    });
   }
 
   const signoAtual = SIGNOS.find((s) => s.nome === signoSelecionado);
@@ -193,30 +182,8 @@ export default function HoroscopoDia() {
 
           {/* Carrossel de signos */}
           <div className="relative">
-            {/* Botão esquerda - desktop */}
-            <button
-              onClick={() => scrollCarrossel("left")}
-              className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-purple-600/80 hover:bg-purple-600 backdrop-blur-sm rounded-full items-center justify-center text-white shadow-lg transition-all"
-              aria-label="Anterior"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-            </button>
-
             {/* Lista de signos */}
             <div
-              ref={carrosselRef}
               className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-2"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
@@ -257,27 +224,6 @@ export default function HoroscopoDia() {
                 );
               })}
             </div>
-
-            {/* Botão direita - desktop */}
-            <button
-              onClick={() => scrollCarrossel("right")}
-              className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-purple-600/80 hover:bg-purple-600 backdrop-blur-sm rounded-full items-center justify-center text-white shadow-lg transition-all"
-              aria-label="Próximo"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
           </div>
 
           {/* Dica mobile */}
@@ -305,10 +251,13 @@ export default function HoroscopoDia() {
             <div
               className={`relative bg-gradient-to-r ${signoAtual.cor} p-6 pb-12`}
             >
-              {/* Botão fechar */}
+              {/* Botão fechar (X) */}
               <button
-                onClick={fecharModal}
-                className="absolute top-4 right-4 w-8 h-8 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center text-white transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fecharModal();
+                }}
+                className="absolute top-4 right-4 w-8 h-8 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center text-white transition-all z-10"
                 aria-label="Fechar"
               >
                 <svg
@@ -375,18 +324,6 @@ export default function HoroscopoDia() {
                   </p>
                 )}
               </div>
-
-              {/* Botão fechar */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  fecharModal();
-                }}
-                className="absolute top-4 right-4 w-8 h-8 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center text-white transition-all z-10"
-                aria-label="Fechar"
-              >
-                Fechar
-              </button>
             </div>
           </div>
         </div>
