@@ -8,6 +8,7 @@ import Link from "next/link";
 import RegistrarAcesso from "./RegistrarAcesso";
 import ProgressoFidelidade from "./ProgressoFidelidade";
 import BannerCarousel from "./BannerCarousel";
+import HoroscopoDia from "./HoroscopoDia";
 
 type Tarologo = {
   id: string;
@@ -317,6 +318,12 @@ export default function HomeContent({
         </header>
       )}
 
+      {/* Horóscopo do Dia */}
+      <HoroscopoDia />
+
+      {/* Indicador online */}
+      <div className="flex items-center justify-center gap-2 mb-4"></div>
+
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -330,9 +337,6 @@ export default function HomeContent({
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-purple-200 text-sm md:text-base">
-              Tarológos online agora
             </span>
           </div>
 

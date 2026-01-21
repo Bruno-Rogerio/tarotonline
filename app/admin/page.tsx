@@ -563,6 +563,14 @@ export default function AdminPage() {
               >
                 🖼️ Gerenciar Banners
               </Link>
+
+              <Link
+                href="/admin/horoscopo"
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+              >
+                🔮 Horóscopo do Dia
+              </Link>
+
               {/* Link Promoções */}
               <Link
                 href="/admin/promocoes"
