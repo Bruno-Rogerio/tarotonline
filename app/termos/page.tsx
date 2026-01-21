@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description:
     "Leia os Termos de Uso da Viaa Tarot: regras de cadastro, pagamentos, natureza das consultas, conduta do usuário e demais condições.",
   alternates: {
-    canonical: "https://SEU-DOMINIO.com/termos",
+    canonical: "https://viaa.app.br/termos",
   },
   robots: {
     index: true,
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: "Termos de Uso | Viaa Tarot",
     description:
       "Confira as condições de uso da plataforma Viaa Tarot, incluindo regras de cadastro, pagamentos e conduta.",
-    url: "https://SEU-DOMINIO.com/termos",
+    url: "https://viaa.app.br/termos",
     siteName: "Viaa Tarot",
     locale: "pt_BR",
     type: "website",

@@ -6,17 +6,17 @@ export const metadata: Metadata = {
   description:
     "Conheça a Viaa Tarot, uma plataforma de tarot online focada em ética, confidencialidade e acolhimento emocional. Missão, visão e valores.",
   alternates: {
-    canonical: "https://SEU-DOMINIO.com/sobre",
+    canonical: "https://viaa.app.br.com/sobre",
   },
   openGraph: {
     title: "Sobre a Viaa Tarot",
     description:
       "Plataforma de tarot online com foco em ética, privacidade e responsabilidade espiritual.",
-    url: "https://SEU-DOMINIO.com/sobre",
+    url: "https://viaa.app.br/sobre",
     siteName: "Viaa Tarot",
     images: [
       {
-        url: "https://SEU-DOMINIO.com/og-sobre.png",
+        url: "https://viaa.app.br/og-sobre.png",
         width: 1200,
         height: 630,
         alt: "Viaa Tarot - Sobre",
