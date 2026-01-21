@@ -476,10 +476,10 @@ export default function HomeContent({
             </div>
             <div className="text-center">
               <div className="text-2xl md:text-4xl font-bold text-white mb-1">
-                24/7
+                Horários Flexíveis
               </div>
               <div className="text-purple-300/70 text-xs md:text-sm">
-                Disponível
+                Atendimento
               </div>
             </div>
           </div>
