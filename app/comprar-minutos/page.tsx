@@ -9,7 +9,7 @@ import CupomInput from "@/components/CupomInput";
 
 export default function ComprarMinutosPage() {
   const [usuario, setUsuario] = useState<any>(null);
-  const [minutosEscolhidos, setMinutosEscolhidos] = useState(1);
+  const [minutosEscolhidos, setMinutosEscolhidos] = useState(40);
   const [loading, setLoading] = useState(true);
   const [processando, setProcessando] = useState(false);
   const [mostrarPix, setMostrarPix] = useState(false);
