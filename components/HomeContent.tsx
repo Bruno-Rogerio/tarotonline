@@ -7,6 +7,7 @@ import HeaderLogado from "./HeaderLogado";
 import Link from "next/link";
 import RegistrarAcesso from "./RegistrarAcesso";
 import ProgressoFidelidade from "./ProgressoFidelidade";
+import BannerCarousel from "./BannerCarousel";
 
 type Tarologo = {
   id: string;
@@ -351,6 +352,8 @@ export default function HomeContent({
             A Viaa Tarot conecta você a tarólogos experientes, oferecendo
             consultas individuais, claras e personalizadas, com privacidade e
             transparência, no momento em que você precisar.
+            {/* Banner Carrossel */}
+            <BannerCarousel autoPlayInterval={5000} />
           </p>
 
           {!usuario && (

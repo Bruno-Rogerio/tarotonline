@@ -557,7 +557,12 @@ export default function AdminPage() {
                 <span>🎟️</span>
                 <span>Cupons</span>
               </Link>
-
+              <Link
+                href="/admin/banners"
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+              >
+                🖼️ Gerenciar Banners
+              </Link>
               {/* Link Promoções */}
               <Link
                 href="/admin/promocoes"
