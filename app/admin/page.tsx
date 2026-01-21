@@ -51,6 +51,48 @@ type Estatisticas = {
   usuariosAtivos: number;
 };
 
+// ============ NOTIFICAÇÕES ============
+function canUseNotifications() {
+  return typeof window !== "undefined" && "Notification" in window;
+}
+
+async function ensureNotificationPermission() {
+  if (!canUseNotifications()) return "unsupported" as const;
+  if (Notification.permission === "granted") return "granted" as const;
+  if (Notification.permission === "denied") return "denied" as const;
+  const permission = await Notification.requestPermission();
+  return permission as "granted" | "denied" | "default";
+}
+
+function notifyBrowser(title: string, body: string) {
+  if (!canUseNotifications()) return;
+  if (Notification.permission !== "granted") return;
+  const shouldNotify = document.visibilityState !== "visible";
+  if (!shouldNotify) return;
+
+  try {
+    const n = new Notification(title, {
+      body,
+      icon: "/logo.png",
+      badge: "/logo.png",
+    });
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
+  } catch (e) {
+    console.warn("Notification falhou:", e);
+  }
+}
+
+function playSound() {
+  try {
+    const audio = new Audio("/sounds/notify.mp3");
+    audio.volume = 0.8;
+    audio.play().catch(() => {});
+  } catch {}
+}
+
 export default function AdminPage() {
   const [abaAtiva, setAbaAtiva] = useState<
     "dashboard" | "consultas" | "pagamentos" | "usuarios"
@@ -75,131 +117,159 @@ export default function AdminPage() {
   const [modalCreditos, setModalCreditos] = useState<Usuario | null>(null);
   const [minutosAdicionar, setMinutosAdicionar] = useState(10);
   const [novaAtividade, setNovaAtividade] = useState(false);
+  const [notifStatus, setNotifStatus] = useState<
+    "unknown" | "unsupported" | "default" | "granted" | "denied"
+  >("unknown");
   const router = useRouter();
 
   const totalPendentes = sessoesPendentes.length + comprasPendentes.length;
 
+  // Verificar suporte a notificações
   useEffect(() => {
-    verificarAdmin();
+    if (!canUseNotifications()) {
+      setNotifStatus("unsupported");
+      return;
+    }
+    setNotifStatus(Notification.permission as any);
   }, []);
 
+  // Inicialização e realtime
   useEffect(() => {
-    if (busca.trim() === "") {
-      setUsuariosFiltrados(usuarios);
-    } else {
-      const termo = busca.toLowerCase();
-      setUsuariosFiltrados(
-        usuarios.filter(
-          (u) =>
-            u.nome.toLowerCase().includes(termo) || u.telefone.includes(termo),
-        ),
+    let channel: any;
+    let isMounted = true;
+
+    const init = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      const { data: userData } = await supabase
+        .from("usuarios")
+        .select("tipo")
+        .eq("id", user.id)
+        .single();
+
+      if (!userData || userData.tipo !== "admin") {
+        alert("Apenas admins podem acessar.");
+        router.push("/");
+        return;
+      }
+
+      if (!isMounted) return;
+
+      setAdminId(user.id);
+      await carregarDados();
+      await ensureNotificationPermission();
+
+      channel = supabase
+        .channel("admin-updates")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "sessoes" },
+          (payload) => {
+            const novaSessao = payload.new as any;
+            if (novaSessao?.status === "aguardando") {
+              carregarSessoesPendentes();
+              mostrarAlertaNovaAtividade();
+              notifyBrowser(
+                "🔔 Nova consulta aguardando",
+                "Entrou uma nova solicitação de consulta.",
+              );
+              playSound();
+            }
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "compras" },
+          (payload) => {
+            const novaCompra = payload.new as any;
+            if (novaCompra?.status === "pendente") {
+              carregarComprasPendentes();
+              mostrarAlertaNovaAtividade();
+              notifyBrowser(
+                "💳 Pagamento pendente",
+                "Entrou um novo pagamento para aprovação.",
+              );
+              playSound();
+            }
+          },
+        )
+        .subscribe();
+
+      setLoading(false);
+    };
+
+    init();
+
+    return () => {
+      isMounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [router]);
+
+  // Filtro de busca
+  useEffect(() => {
+    if (busca) {
+      const filtrados = usuarios.filter(
+        (u) =>
+          u.nome.toLowerCase().includes(busca.toLowerCase()) ||
+          u.telefone?.includes(busca),
       );
+      setUsuariosFiltrados(filtrados);
+    } else {
+      setUsuariosFiltrados(usuarios);
     }
   }, [busca, usuarios]);
 
-  // Realtime para novas consultas e pagamentos
+  // Título da página com contador
   useEffect(() => {
-    const channel = supabase
-      .channel("admin-realtime")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "sessoes" },
-        () => {
-          setNovaAtividade(true);
-          carregarDados();
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "compras" },
-        () => {
-          setNovaAtividade(true);
-          carregarDados();
-        },
-      )
-      .subscribe();
+    const total = sessoesPendentes.length + comprasPendentes.length;
+    document.title =
+      total > 0 ? `(${total}) Admin - Viaa Tarot` : "Admin - Viaa Tarot";
+  }, [sessoesPendentes.length, comprasPendentes.length]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  function mostrarAlertaNovaAtividade() {
+    setNovaAtividade(true);
+    setTimeout(() => setNovaAtividade(false), 5000);
+  }
 
-  async function verificarAdmin() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  async function ativarNotificacoes() {
+    const permission = await ensureNotificationPermission();
+    setNotifStatus(permission);
 
-    if (!user) {
-      router.push("/login");
+    if (permission === "unsupported") {
+      alert("Este navegador não suporta notificações.");
       return;
     }
 
-    const { data: userData } = await supabase
-      .from("usuarios")
-      .select("tipo")
-      .eq("id", user.id)
-      .single();
-
-    if (userData?.tipo !== "admin") {
-      alert("Acesso negado!");
-      router.push("/");
-      return;
+    if (permission === "granted") {
+      try {
+        new Notification("✅ Notificações ativadas", {
+          body: "Você será avisada quando entrar consulta ou pagamento pendente.",
+          icon: "/logo.png",
+        });
+        playSound();
+      } catch {}
+    } else if (permission === "denied") {
+      alert(
+        "As notificações estão bloqueadas. Libere nas configurações do site (ícone de cadeado).",
+      );
     }
-
-    setAdminId(user.id);
-    carregarDados();
   }
 
   async function carregarDados() {
     await Promise.all([
       carregarComprasPendentes(),
       carregarSessoesPendentes(),
-      carregarUsuarios(),
       carregarEstatisticas(),
+      carregarUsuarios(),
     ]);
-    setLoading(false);
-  }
-
-  async function carregarComprasPendentes() {
-    const { data } = await supabase
-      .from("compras")
-      .select("*, usuarios(nome, telefone)")
-      .eq("status", "pendente")
-      .order("created_at", { ascending: false });
-
-    if (data) setComprasPendentes(data);
-  }
-
-  async function carregarSessoesPendentes() {
-    const { data } = await supabase
-      .from("sessoes")
-      .select(
-        "id, usuario_id, tarologo_id, minutos_comprados, created_at, usuario:usuarios!sessoes_usuario_id_fkey(nome, telefone, minutos_disponiveis), tarologo:tarologos!sessoes_tarologo_id_fkey(nome)",
-      )
-      .eq("status", "pendente")
-      .order("created_at", { ascending: false });
-
-    if (data) {
-      const sessoes = data.map((s: any) => ({
-        ...s,
-        usuario: s.usuario,
-        tarologo: s.tarologo,
-      }));
-      setSessoesPendentes(sessoes);
-    }
-  }
-
-  async function carregarUsuarios() {
-    const { data } = await supabase
-      .from("usuarios")
-      .select("id, nome, telefone, minutos_disponiveis, created_at")
-      .eq("tipo", "cliente")
-      .order("created_at", { ascending: false });
-
-    if (data) {
-      setUsuarios(data);
-      setUsuariosFiltrados(data);
-    }
   }
 
   async function carregarEstatisticas() {
@@ -211,7 +281,7 @@ export default function AdminPage() {
     const { count: totalConsultas } = await supabase
       .from("sessoes")
       .select("*", { count: "exact", head: true })
-      .eq("status", "finalizada");
+      .in("status", ["em_andamento", "finalizada"]);
 
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
@@ -256,16 +326,54 @@ export default function AdminPage() {
     });
   }
 
+  async function carregarUsuarios() {
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("id, nome, telefone, minutos_disponiveis, created_at")
+      .eq("tipo", "cliente")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setUsuarios(data);
+      setUsuariosFiltrados(data);
+    }
+  }
+
+  async function carregarComprasPendentes() {
+    const { data, error } = await supabase
+      .from("compras")
+      .select("*, usuarios (nome, telefone)")
+      .eq("status", "pendente")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setComprasPendentes(data as any);
+    }
+  }
+
+  async function carregarSessoesPendentes() {
+    const { data, error } = await supabase
+      .from("sessoes")
+      .select(
+        `id, usuario_id, tarologo_id, minutos_comprados, created_at,
+        usuario:usuarios!sessoes_usuario_id_fkey(nome, telefone, minutos_disponiveis),
+        tarologo:tarologos(nome)`,
+      )
+      .eq("status", "aguardando")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setSessoesPendentes(data as any);
+    }
+  }
+
   async function aprovarCompra(compra: Compra) {
-    const { error: updateError } = await supabase
+    setLoading(true);
+
+    await supabase
       .from("compras")
       .update({ status: "aprovado" })
       .eq("id", compra.id);
-
-    if (updateError) {
-      alert("Erro ao aprovar compra");
-      return;
-    }
 
     const { data: usuario } = await supabase
       .from("usuarios")
@@ -273,43 +381,47 @@ export default function AdminPage() {
       .eq("id", compra.usuario_id)
       .single();
 
-    if (usuario) {
-      await supabase
-        .from("usuarios")
-        .update({
-          minutos_disponiveis: usuario.minutos_disponiveis + compra.minutos,
-        })
-        .eq("id", compra.usuario_id);
-    }
+    await supabase
+      .from("usuarios")
+      .update({
+        minutos_disponiveis:
+          (usuario?.minutos_disponiveis || 0) + compra.minutos,
+      })
+      .eq("id", compra.usuario_id);
 
-    alert("✅ Compra aprovada! Minutos creditados.");
+    alert("✅ Compra aprovada e minutos liberados!");
     carregarDados();
+    setLoading(false);
   }
 
-  async function recusarCompra(compraId: string) {
+  async function recusarCompra(compra: Compra) {
     if (!confirm("Tem certeza que deseja recusar esta compra?")) return;
 
+    setLoading(true);
     await supabase
       .from("compras")
-      .update({ status: "recusado" })
-      .eq("id", compraId);
-
-    alert("Compra recusada.");
+      .update({ status: "cancelado" })
+      .eq("id", compra.id);
+    alert("❌ Compra recusada!");
     carregarDados();
+    setLoading(false);
   }
 
   async function aceitarConsulta(sessao: SessaoPendente) {
+    setLoading(true);
+
     const { error } = await supabase
       .from("sessoes")
       .update({
-        status: "ativa",
+        status: "em_andamento",
         admin_id: adminId,
         inicio: new Date().toISOString(),
       })
       .eq("id", sessao.id);
 
     if (error) {
-      alert("Erro ao aceitar consulta");
+      alert("Erro ao aceitar consulta: " + error.message);
+      setLoading(false);
       return;
     }
 
@@ -319,14 +431,17 @@ export default function AdminPage() {
   async function recusarConsulta(sessao: SessaoPendente) {
     if (!confirm("Tem certeza que deseja recusar esta consulta?")) return;
 
+    setLoading(true);
     await supabase.from("sessoes").delete().eq("id", sessao.id);
-
-    alert("Consulta recusada.");
+    alert("❌ Consulta recusada!");
     carregarDados();
+    setLoading(false);
   }
 
   async function adicionarCreditos() {
     if (!modalCreditos) return;
+
+    setLoading(true);
 
     const { error } = await supabase
       .from("usuarios")
@@ -338,15 +453,16 @@ export default function AdminPage() {
 
     if (error) {
       alert("Erro ao adicionar créditos");
-      return;
+    } else {
+      alert(
+        `✅ ${minutosAdicionar} minutos adicionados para ${modalCreditos.nome}!`,
+      );
     }
 
-    alert(
-      `✅ ${minutosAdicionar} minutos adicionados para ${modalCreditos.nome}!`,
-    );
     setModalCreditos(null);
     setMinutosAdicionar(10);
     carregarDados();
+    setLoading(false);
   }
 
   async function handleSair() {
@@ -358,7 +474,7 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-5xl mb-4 animate-pulse">🔮</div>
+          <div className="text-5xl mb-4 animate-pulse">⚡</div>
           <div className="text-white/70">Carregando painel...</div>
         </div>
       </div>
@@ -367,43 +483,99 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Header fixo */}
-      <header className="bg-gray-900/80 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
+      {/* Toast de nova atividade */}
+      {novaAtividade && (
+        <div className="fixed top-4 right-4 z-50 animate-bounce">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+            <span className="text-2xl">🔔</span>
+            <div>
+              <p className="font-bold">Nova atividade!</p>
+              <p className="text-sm text-white/80">Verifique as pendências</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <header className="bg-gray-900/80 backdrop-blur-md border-b border-white/10 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
-            {/* Logo e título */}
+            {/* Logo */}
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center gap-2">
-                <span className="text-2xl">🔮</span>
-                <span className="text-xl font-bold text-white hidden sm:block">
+                <img src="/logo.png" alt="Viaa Tarot" className="w-8 h-8" />
+                <span className="text-lg font-bold text-white hidden sm:block">
                   Viaa Tarot
                 </span>
               </Link>
-              <span className="text-white/30">|</span>
-              <span className="text-purple-400 font-medium">Admin</span>
-            </div>
-
-            {/* Notificação de pendências */}
-            {totalPendentes > 0 && (
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-full">
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                <span className="text-red-400 text-sm font-medium">
+              <span className="bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">
+                Admin
+              </span>
+              {totalPendentes > 0 && (
+                <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
                   {totalPendentes} pendente{totalPendentes > 1 ? "s" : ""}
                 </span>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* Ações */}
-            <div className="flex items-center gap-4">
+            {/* Ações do Header */}
+            <div className="flex items-center gap-2">
+              {/* Notificações */}
+              {notifStatus !== "unsupported" && (
+                <button
+                  onClick={ativarNotificacoes}
+                  className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition-all ${
+                    notifStatus === "granted"
+                      ? "bg-green-500/10 border-green-500/30 text-green-400"
+                      : notifStatus === "denied"
+                        ? "bg-red-500/10 border-red-500/30 text-red-400"
+                        : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                  }`}
+                >
+                  <span>
+                    {notifStatus === "granted"
+                      ? "🔔"
+                      : notifStatus === "denied"
+                        ? "🔕"
+                        : "🔔"}
+                  </span>
+                  <span className="hidden md:inline">
+                    {notifStatus === "granted"
+                      ? "Ativo"
+                      : notifStatus === "denied"
+                        ? "Bloqueado"
+                        : "Ativar"}
+                  </span>
+                </button>
+              )}
+
+              {/* Link Cupons */}
+              <Link
+                href="/admin/cupons"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-pink-500/10 border border-pink-500/20 text-pink-400 rounded-lg text-sm hover:bg-pink-500/20 transition-all"
+              >
+                <span>🎟️</span>
+                <span>Cupons</span>
+              </Link>
+
+              {/* Link Promoções */}
+              <Link
+                href="/admin/promocoes"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-lg text-sm hover:bg-yellow-500/20 transition-all"
+              >
+                <span>🎁</span>
+                <span>Promoções</span>
+              </Link>
+
               <Link
                 href="/"
-                className="text-white/60 hover:text-white text-sm transition-colors"
+                className="text-white/50 hover:text-white text-sm px-3 py-1.5"
               >
-                Ver site
+                Home
               </Link>
               <button
                 onClick={handleSair}
-                className="text-white/60 hover:text-white text-sm transition-colors"
+                className="text-white/50 hover:text-white text-sm px-3 py-1.5"
               >
                 Sair
               </button>
@@ -445,13 +617,7 @@ export default function AdminPage() {
                 <span>{aba.icon}</span>
                 <span className="hidden sm:inline">{aba.label}</span>
                 {aba.count !== undefined && aba.count > 0 && (
-                  <span
-                    className={`min-w-[22px] h-[22px] flex items-center justify-center px-1.5 rounded-full text-xs font-bold ${
-                      abaAtiva === aba.id
-                        ? "bg-red-500 text-white"
-                        : "bg-red-500 text-white"
-                    }`}
-                  >
+                  <span className="min-w-[22px] h-[22px] flex items-center justify-center px-1.5 rounded-full text-xs font-bold bg-red-500 text-white">
                     {aba.count}
                   </span>
                 )}
@@ -476,7 +642,6 @@ export default function AdminPage() {
                         Atenção necessária
                       </h3>
                       <p className="text-white/60">
-                        Você tem{" "}
                         {sessoesPendentes.length > 0 &&
                           `${sessoesPendentes.length} consulta(s)`}
                         {sessoesPendentes.length > 0 &&
@@ -504,114 +669,252 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* Seção: Visão Geral */}
+            {/* Seção: Acesso Rápido */}
             <section>
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-1 h-6 bg-purple-500 rounded-full" />
                 <h2 className="text-xl font-semibold text-white">
-                  Visão Geral
+                  Acesso Rápido
                 </h2>
               </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Card: Total de Usuários */}
-                <div className="bg-gray-900/50 rounded-2xl p-6 border border-white/5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                      <span className="text-xl">👥</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Card Cupons */}
+                <Link
+                  href="/admin/cupons"
+                  className="group bg-gray-900/50 rounded-2xl p-6 border border-white/5 hover:border-pink-500/30 transition-all hover:shadow-lg hover:shadow-pink-500/5"
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-purple-500 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-lg">
+                      🎟️
+                    </div>
+                    <div>
+                      <h4 className="text-white font-bold text-lg">
+                        Cupons de Desconto
+                      </h4>
+                      <p className="text-white/50 text-sm">
+                        Criar e gerenciar cupons
+                      </p>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-white mb-1">
-                    {estatisticas.totalUsuarios}
-                  </div>
-                  <div className="text-white/50 text-sm">Total de usuários</div>
-                </div>
+                  <p className="text-pink-400/70 text-sm">
+                    Crie cupons de % OFF, R$ OFF ou minutos extras para
+                    campanhas
+                  </p>
+                </Link>
 
-                {/* Card: Usuários com créditos */}
-                <div className="bg-gray-900/50 rounded-2xl p-6 border border-white/5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center">
-                      <span className="text-xl">✅</span>
+                {/* Card Promoções */}
+                <Link
+                  href="/admin/promocoes"
+                  className="group bg-gray-900/50 rounded-2xl p-6 border border-white/5 hover:border-yellow-500/30 transition-all hover:shadow-lg hover:shadow-yellow-500/5"
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-lg">
+                      🎁
+                    </div>
+                    <div>
+                      <h4 className="text-white font-bold text-lg">
+                        Promoções & Fidelidade
+                      </h4>
+                      <p className="text-white/50 text-sm">
+                        Configure bônus automáticos
+                      </p>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-white mb-1">
-                    {estatisticas.usuariosAtivos}
-                  </div>
-                  <div className="text-white/50 text-sm">
-                    Com créditos ativos
-                  </div>
-                </div>
+                  <p className="text-yellow-400/70 text-sm">
+                    Recompense clientes fiéis com minutos de bônus
+                    automaticamente
+                  </p>
+                </Link>
 
-                {/* Card: Total de Consultas */}
-                <div className="bg-gray-900/50 rounded-2xl p-6 border border-white/5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                      <span className="text-xl">🔮</span>
+                {/* Card Relatórios (placeholder) */}
+                <div className="bg-gray-900/30 rounded-2xl p-6 border border-white/5 opacity-50">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl">
+                      📊
+                    </div>
+                    <div>
+                      <h4 className="text-white/70 font-bold text-lg">
+                        Relatórios
+                      </h4>
+                      <p className="text-white/40 text-sm">Em breve</p>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-white mb-1">
-                    {estatisticas.totalConsultas}
-                  </div>
-                  <div className="text-white/50 text-sm">
-                    Consultas realizadas
-                  </div>
-                </div>
-
-                {/* Card: Consultas Hoje */}
-                <div className="bg-gray-900/50 rounded-2xl p-6 border border-white/5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center">
-                      <span className="text-xl">📅</span>
-                    </div>
-                  </div>
-                  <div className="text-3xl font-bold text-white mb-1">
-                    {estatisticas.consultasHoje}
-                  </div>
-                  <div className="text-white/50 text-sm">Consultas hoje</div>
                 </div>
               </div>
             </section>
 
-            {/* Seção: Financeiro */}
+            {/* Seção: Estatísticas */}
             <section>
               <div className="flex items-center gap-3 mb-5">
-                <div className="w-1 h-6 bg-green-500 rounded-full" />
-                <h2 className="text-xl font-semibold text-white">Financeiro</h2>
+                <div className="w-1 h-6 bg-blue-500 rounded-full" />
+                <h2 className="text-xl font-semibold text-white">
+                  Estatísticas do Negócio
+                </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Card: Receita do Mês */}
-                <div className="bg-gray-900/50 rounded-2xl p-6 border border-white/5">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-green-500/20 rounded-2xl flex items-center justify-center">
-                      <span className="text-3xl">💰</span>
-                    </div>
-                    <div>
-                      <div className="text-white/50 text-sm mb-1">
-                        Receita este mês
-                      </div>
-                      <div className="text-3xl font-bold text-green-400">
-                        R$ {estatisticas.receitaMes.toFixed(2)}
-                      </div>
-                    </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="bg-gray-900/50 rounded-2xl p-5 border border-white/5">
+                  <div className="text-2xl mb-3">👥</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticas.totalUsuarios}
                   </div>
+                  <div className="text-white/50 text-sm">Total usuários</div>
                 </div>
 
-                {/* Card: Receita Total */}
-                <div className="bg-gray-900/50 rounded-2xl p-6 border border-white/5">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-purple-500/20 rounded-2xl flex items-center justify-center">
-                      <span className="text-3xl">💎</span>
-                    </div>
-                    <div>
-                      <div className="text-white/50 text-sm mb-1">
-                        Receita total
-                      </div>
-                      <div className="text-3xl font-bold text-white">
-                        R$ {estatisticas.receitaTotal.toFixed(2)}
-                      </div>
-                    </div>
+                <div className="bg-gray-900/50 rounded-2xl p-5 border border-white/5">
+                  <div className="text-2xl mb-3">✅</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticas.usuariosAtivos}
                   </div>
+                  <div className="text-white/50 text-sm">Com créditos</div>
+                </div>
+
+                <div className="bg-gray-900/50 rounded-2xl p-5 border border-white/5">
+                  <div className="text-2xl mb-3">🔮</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticas.totalConsultas}
+                  </div>
+                  <div className="text-white/50 text-sm">Total consultas</div>
+                </div>
+
+                <div className="bg-gray-900/50 rounded-2xl p-5 border border-white/5">
+                  <div className="text-2xl mb-3">📅</div>
+                  <div className="text-2xl font-bold text-white">
+                    {estatisticas.consultasHoje}
+                  </div>
+                  <div className="text-white/50 text-sm">Consultas hoje</div>
+                </div>
+
+                <div className="bg-gray-900/50 rounded-2xl p-5 border border-white/5">
+                  <div className="text-2xl mb-3">💰</div>
+                  <div className="text-2xl font-bold text-green-400">
+                    R$ {estatisticas.receitaMes.toFixed(0)}
+                  </div>
+                  <div className="text-white/50 text-sm">Receita mês</div>
+                </div>
+
+                <div className="bg-gray-900/50 rounded-2xl p-5 border border-white/5">
+                  <div className="text-2xl mb-3">💎</div>
+                  <div className="text-2xl font-bold text-white">
+                    R$ {estatisticas.receitaTotal.toFixed(0)}
+                  </div>
+                  <div className="text-white/50 text-sm">Receita total</div>
+                </div>
+              </div>
+            </section>
+
+            {/* Seção: Pendências Rápidas */}
+            <section>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-1 h-6 bg-yellow-500 rounded-full" />
+                <h2 className="text-xl font-semibold text-white">Pendências</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Consultas pendentes */}
+                <div className="bg-gray-900/50 rounded-2xl p-6 border border-white/5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-white font-semibold flex items-center gap-2">
+                      <span>💬</span> Consultas Pendentes
+                    </h3>
+                    {sessoesPendentes.length > 0 && (
+                      <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full">
+                        {sessoesPendentes.length}
+                      </span>
+                    )}
+                  </div>
+
+                  {sessoesPendentes.length === 0 ? (
+                    <p className="text-white/40 text-sm">
+                      ✅ Nenhuma consulta aguardando
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {sessoesPendentes.slice(0, 3).map((sessao) => (
+                        <div
+                          key={sessao.id}
+                          className="bg-white/5 rounded-xl p-4 flex items-center justify-between"
+                        >
+                          <div>
+                            <p className="text-white font-medium">
+                              {sessao.usuario.nome}
+                            </p>
+                            <p className="text-purple-400 text-sm">
+                              → {sessao.tarologo.nome}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => aceitarConsulta(sessao)}
+                            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-all"
+                          >
+                            Aceitar
+                          </button>
+                        </div>
+                      ))}
+                      {sessoesPendentes.length > 3 && (
+                        <button
+                          onClick={() => setAbaAtiva("consultas")}
+                          className="text-purple-400 text-sm hover:text-purple-300 w-full text-center pt-2"
+                        >
+                          Ver todas ({sessoesPendentes.length})
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Pagamentos pendentes */}
+                <div className="bg-gray-900/50 rounded-2xl p-6 border border-white/5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-white font-semibold flex items-center gap-2">
+                      <span>💳</span> Pagamentos Pendentes
+                    </h3>
+                    {comprasPendentes.length > 0 && (
+                      <span className="bg-green-500 text-black text-xs font-bold px-2 py-1 rounded-full">
+                        {comprasPendentes.length}
+                      </span>
+                    )}
+                  </div>
+
+                  {comprasPendentes.length === 0 ? (
+                    <p className="text-white/40 text-sm">
+                      ✅ Nenhum pagamento aguardando
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {comprasPendentes.slice(0, 3).map((compra) => (
+                        <div
+                          key={compra.id}
+                          className="bg-white/5 rounded-xl p-4 flex items-center justify-between"
+                        >
+                          <div>
+                            <p className="text-white font-medium">
+                              {compra.usuarios.nome}
+                            </p>
+                            <p className="text-green-400 text-sm font-medium">
+                              R$ {compra.valor.toFixed(2)} • {compra.minutos}{" "}
+                              min
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => aprovarCompra(compra)}
+                            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-all"
+                          >
+                            Aprovar
+                          </button>
+                        </div>
+                      ))}
+                      {comprasPendentes.length > 3 && (
+                        <button
+                          onClick={() => setAbaAtiva("pagamentos")}
+                          className="text-purple-400 text-sm hover:text-purple-300 w-full text-center pt-2"
+                        >
+                          Ver todos ({comprasPendentes.length})
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
@@ -621,19 +924,16 @@ export default function AdminPage() {
         {/* ==================== CONSULTAS ==================== */}
         {abaAtiva === "consultas" && (
           <div className="space-y-6">
-            {/* Header da seção */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-1 h-6 bg-purple-500 rounded-full" />
-                <h2 className="text-xl font-semibold text-white">
-                  Consultas Pendentes
-                </h2>
-                {sessoesPendentes.length > 0 && (
-                  <span className="px-3 py-1 bg-purple-500/20 text-purple-400 text-sm font-medium rounded-full">
-                    {sessoesPendentes.length}
-                  </span>
-                )}
-              </div>
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-6 bg-purple-500 rounded-full" />
+              <h2 className="text-xl font-semibold text-white">
+                Consultas Pendentes
+              </h2>
+              {sessoesPendentes.length > 0 && (
+                <span className="px-3 py-1 bg-purple-500/20 text-purple-400 text-sm font-medium rounded-full">
+                  {sessoesPendentes.length}
+                </span>
+              )}
             </div>
 
             {sessoesPendentes.length === 0 ? (
@@ -656,9 +956,7 @@ export default function AdminPage() {
                     className="bg-gray-900/50 rounded-2xl p-6 border border-white/5 hover:border-purple-500/30 transition-colors"
                   >
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                      {/* Informações */}
-                      <div className="flex-1 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {/* Cliente */}
+                      <div className="flex-1 grid sm:grid-cols-3 gap-6">
                         <div>
                           <div className="text-white/40 text-xs uppercase tracking-wider mb-2">
                             Cliente
@@ -669,12 +967,14 @@ export default function AdminPage() {
                           <div className="text-white/50 text-sm">
                             {sessao.usuario.telefone}
                           </div>
+                          <div className="text-green-400 text-sm">
+                            {sessao.usuario.minutos_disponiveis} min disponíveis
+                          </div>
                         </div>
 
-                        {/* Tarólogo */}
                         <div>
                           <div className="text-white/40 text-xs uppercase tracking-wider mb-2">
-                            Tarólogo solicitado
+                            Tarólogo
                           </div>
                           <div className="text-purple-400 font-medium">
                             {sessao.tarologo.nome}
@@ -684,10 +984,9 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* Data */}
                         <div>
                           <div className="text-white/40 text-xs uppercase tracking-wider mb-2">
-                            Solicitado em
+                            Solicitado
                           </div>
                           <div className="text-white/70">
                             {new Date(sessao.created_at).toLocaleDateString(
@@ -697,16 +996,12 @@ export default function AdminPage() {
                           <div className="text-white/50 text-sm">
                             {new Date(sessao.created_at).toLocaleTimeString(
                               "pt-BR",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
+                              { hour: "2-digit", minute: "2-digit" },
                             )}
                           </div>
                         </div>
                       </div>
 
-                      {/* Ações */}
                       <div className="flex gap-3">
                         <button
                           onClick={() => recusarConsulta(sessao)}
@@ -732,19 +1027,16 @@ export default function AdminPage() {
         {/* ==================== PAGAMENTOS ==================== */}
         {abaAtiva === "pagamentos" && (
           <div className="space-y-6">
-            {/* Header da seção */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-1 h-6 bg-green-500 rounded-full" />
-                <h2 className="text-xl font-semibold text-white">
-                  Pagamentos Pendentes
-                </h2>
-                {comprasPendentes.length > 0 && (
-                  <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm font-medium rounded-full">
-                    {comprasPendentes.length}
-                  </span>
-                )}
-              </div>
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-6 bg-green-500 rounded-full" />
+              <h2 className="text-xl font-semibold text-white">
+                Pagamentos Pendentes
+              </h2>
+              {comprasPendentes.length > 0 && (
+                <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm font-medium rounded-full">
+                  {comprasPendentes.length}
+                </span>
+              )}
             </div>
 
             {comprasPendentes.length === 0 ? (
@@ -767,9 +1059,7 @@ export default function AdminPage() {
                     className="bg-gray-900/50 rounded-2xl p-6 border border-white/5 hover:border-green-500/30 transition-colors"
                   >
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                      {/* Informações */}
-                      <div className="flex-1 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {/* Cliente */}
+                      <div className="flex-1 grid sm:grid-cols-4 gap-6">
                         <div>
                           <div className="text-white/40 text-xs uppercase tracking-wider mb-2">
                             Cliente
@@ -782,7 +1072,6 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* Valor */}
                         <div>
                           <div className="text-white/40 text-xs uppercase tracking-wider mb-2">
                             Valor
@@ -792,7 +1081,6 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* Minutos */}
                         <div>
                           <div className="text-white/40 text-xs uppercase tracking-wider mb-2">
                             Minutos
@@ -802,7 +1090,6 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* Data */}
                         <div>
                           <div className="text-white/40 text-xs uppercase tracking-wider mb-2">
                             Data
@@ -815,19 +1102,15 @@ export default function AdminPage() {
                           <div className="text-white/50 text-sm">
                             {new Date(compra.created_at).toLocaleTimeString(
                               "pt-BR",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
+                              { hour: "2-digit", minute: "2-digit" },
                             )}
                           </div>
                         </div>
                       </div>
 
-                      {/* Ações */}
                       <div className="flex gap-3">
                         <button
-                          onClick={() => recusarCompra(compra.id)}
+                          onClick={() => recusarCompra(compra)}
                           className="px-5 py-2.5 bg-white/5 hover:bg-red-500/20 text-white/70 hover:text-red-400 font-medium rounded-xl transition-colors border border-white/10 hover:border-red-500/30"
                         >
                           Recusar
@@ -850,7 +1133,6 @@ export default function AdminPage() {
         {/* ==================== USUÁRIOS ==================== */}
         {abaAtiva === "usuarios" && (
           <div className="space-y-6">
-            {/* Header da seção */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-6 bg-blue-500 rounded-full" />
@@ -860,7 +1142,6 @@ export default function AdminPage() {
                 </span>
               </div>
 
-              {/* Busca */}
               <div className="relative">
                 <input
                   type="text"
@@ -875,9 +1156,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Lista de usuários */}
             <div className="bg-gray-900/50 rounded-2xl border border-white/5 overflow-hidden">
-              {/* Header da tabela */}
               <div className="hidden md:grid grid-cols-5 gap-4 px-6 py-4 bg-gray-900/50 border-b border-white/5">
                 <div className="text-white/40 text-xs uppercase tracking-wider">
                   Nome
@@ -896,7 +1175,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Linhas */}
               {usuariosFiltrados.length === 0 ? (
                 <div className="p-12 text-center">
                   <div className="text-white/40">Nenhum usuário encontrado</div>
@@ -956,11 +1234,10 @@ export default function AdminPage() {
       {modalCreditos && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-900 rounded-2xl p-6 border border-white/10 w-full max-w-md">
-            <h3 className="text-xl font-semibold text-white mb-6">
-              Adicionar Créditos
+            <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+              <span>💎</span> Adicionar Créditos
             </h3>
 
-            {/* Info do usuário */}
             <div className="bg-white/5 rounded-xl p-4 mb-6">
               <div className="text-white font-medium">{modalCreditos.nome}</div>
               <div className="text-white/50 text-sm">
@@ -971,13 +1248,12 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Opções de minutos */}
             <div className="mb-6">
               <label className="text-white/60 text-sm mb-3 block">
                 Minutos a adicionar
               </label>
-              <div className="grid grid-cols-4 gap-2">
-                {[5, 10, 20, 30, 60, 90, 120, 180].map((min) => (
+              <div className="grid grid-cols-5 gap-2 mb-3">
+                {[5, 10, 20, 30, 60].map((min) => (
                   <button
                     key={min}
                     onClick={() => setMinutosAdicionar(min)}
@@ -991,9 +1267,17 @@ export default function AdminPage() {
                   </button>
                 ))}
               </div>
+              <input
+                type="number"
+                value={minutosAdicionar}
+                onChange={(e) =>
+                  setMinutosAdicionar(parseInt(e.target.value) || 0)
+                }
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-center text-xl font-bold focus:outline-none focus:border-purple-500"
+                min={1}
+              />
             </div>
 
-            {/* Preview */}
             <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 mb-6">
               <div className="text-center">
                 <div className="text-white/60 text-sm">Novo saldo será</div>
@@ -1003,7 +1287,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Botões */}
             <div className="flex gap-3">
               <button
                 onClick={() => {
