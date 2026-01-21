@@ -349,7 +349,7 @@ export default function AdminBannersPage() {
                     <img
                       src={banner.imagem_url}
                       alt={banner.titulo}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain bg-black/20"
                     />
                   </div>
 
@@ -471,7 +471,7 @@ export default function AdminBannersPage() {
                     <img
                       src={imagemPreview}
                       alt="Preview"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain bg-black/20"
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full text-purple-200/50">
