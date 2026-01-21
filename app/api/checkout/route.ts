@@ -5,7 +5,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 // Mapeamento de minutos para Price IDs do Stripe
 const PRICE_IDS: Record<number, string> = {
-  1: "price_1SrpOFFFAjgAeuC1a9mc6JCf",
+  //1: "price_1SrpOFFFAjgAeuC1a9mc6JCf",
   20: "price_1SrSyNFFAjgAeuC1Ie10oYE5",
   30: "price_1SrSykFFAjgAeuC1DhP5nkcx",
   40: "price_1SrSyyFFAjgAeuC1YSN1aV0W",

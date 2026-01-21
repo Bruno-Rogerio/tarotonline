@@ -31,7 +31,7 @@ export default function ComprarMinutosPage() {
 
   // Pacotes com desconto
   const pacotes = [
-    { minutos: 1, desconto: 0, popular: false },
+    //{ minutos: 1, desconto: 0, popular: false },
     { minutos: 20, desconto: 0, popular: false },
     { minutos: 30, desconto: 5, popular: false },
     { minutos: 40, desconto: 10, popular: true },
