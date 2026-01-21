@@ -33,19 +33,11 @@ export default function TarologoCard({
   usuarioLogado?: boolean;
   temMinutos?: boolean;
   isAdmin?: boolean;
-  onChangeStatus?: (
-    status: "disponivel" | "ocupado" | "indisponivel",
-    minutos?: number,
-  ) => void;
+  onChangeStatus?: (status: "disponivel" | "ocupado" | "indisponivel") => void;
 }) {
   const [flipped, setFlipped] = useState(false);
   const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
   const [loading, setLoading] = useState(false);
-
-  // Modal para escolher tempo quando status = ocupado
-  const [mostrarModalTempo, setMostrarModalTempo] = useState(false);
-  const [tempoSelecionado, setTempoSelecionado] = useState(30);
-  const [tempoCustomizado, setTempoCustomizado] = useState("");
 
   const statusConfig = {
     disponivel: {
@@ -96,27 +88,6 @@ export default function TarologoCard({
     setLoading(false);
   }
 
-  // Quando admin clica em "ocupado", abre modal para escolher tempo
-  function handleOcupadoClick() {
-    setMostrarModalTempo(true);
-  }
-
-  // Confirmar tempo e mudar status
-  function confirmarTempo() {
-    const minutos =
-      tempoCustomizado !== "" ? parseInt(tempoCustomizado) : tempoSelecionado;
-
-    if (minutos > 0) {
-      onChangeStatus?.("ocupado", minutos);
-    }
-    setMostrarModalTempo(false);
-    setTempoSelecionado(30);
-    setTempoCustomizado("");
-  }
-
-  // Opções de tempo pré-definidas
-  const opcoesTempoRapido = [15, 30, 45, 60, 90, 120];
-
   return (
     <div className="perspective-1000 h-[420px] md:h-[460px]">
       <div
@@ -126,321 +97,318 @@ export default function TarologoCard({
       >
         {/* FRENTE DO CARD */}
         <div className="absolute w-full h-full backface-hidden">
-          <div
-            className={`bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-sm rounded-2xl p-5 border border-white/20 h-full flex flex-col shadow-xl ${status.glow} shadow-lg`}
-          >
-            {/* Avatar e Status */}
-            <div className="relative mb-4">
-              <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-3 border-white/30 shadow-lg">
-                {tarologo.avatar_url ? (
-                  <img
-                    src={tarologo.avatar_url}
-                    alt={tarologo.nome}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-3xl">
-                    🔮
+          <div className="group relative bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm rounded-2xl border border-white/10 hover:border-purple-500/30 transition-all duration-300 h-full flex flex-col overflow-hidden">
+            {/* Glow effect on hover */}
+            <div className="absolute inset-0 bg-gradient-to-b from-purple-500/0 to-purple-500/0 group-hover:from-purple-500/5 group-hover:to-pink-500/5 transition-all duration-300 rounded-2xl" />
+
+            {/* Status indicator bar */}
+            <div
+              className={`h-1 w-full ${status.bg} ${status.glow} shadow-lg`}
+            />
+
+            <div className="relative flex flex-col items-center flex-1 p-5 md:p-6">
+              {/* Avatar com glow */}
+              <div className="relative mb-4">
+                {/* Glow ring */}
+                <div
+                  className={`absolute inset-0 ${status.bg} rounded-full blur-md opacity-30 scale-110`}
+                />
+
+                {/* Avatar */}
+                <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full border-3 border-purple-400/50 bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 flex items-center justify-center text-white text-2xl md:text-3xl font-bold shadow-xl">
+                  {tarologo.avatar_url ? (
+                    <img
+                      src={tarologo.avatar_url}
+                      alt={tarologo.nome}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    tarologo.nome.charAt(0)
+                  )}
+                </div>
+
+                {/* Status badge */}
+                <div
+                  className={`absolute -bottom-1 -right-1 w-6 h-6 ${status.bg} rounded-full border-3 border-purple-950 flex items-center justify-center text-xs shadow-lg ${status.glow}`}
+                >
+                  <span className="text-white text-[10px]">{status.icon}</span>
+                </div>
+              </div>
+
+              {/* Nome */}
+              <h3 className="text-lg md:text-xl font-bold text-white mb-1 text-center">
+                {tarologo.nome}
+              </h3>
+
+              {/* Especialidade */}
+              <div className="flex items-center gap-1.5 mb-3">
+                <span className="text-purple-400 text-sm">✦</span>
+                <p className="text-purple-300/80 text-sm">
+                  {tarologo.especialidade || "Tarot Geral"}
+                </p>
+              </div>
+
+              {/* Biografia */}
+              <p className="text-white/60 text-xs md:text-sm text-center mb-4 line-clamp-2 px-2">
+                {tarologo.biografia || "Especialista em leituras de tarot"}
+              </p>
+
+              {/* Estatísticas */}
+              <div className="flex items-center justify-center gap-6 mb-4">
+                <div className="text-center">
+                  <div className="flex items-center gap-1 text-yellow-400 font-bold text-sm md:text-base">
+                    <span>⭐</span>
+                    <span>{tarologo.avaliacao_media}</span>
+                  </div>
+                  <div className="text-white/50 text-[10px] md:text-xs">
+                    Avaliação
+                  </div>
+                </div>
+                <div className="w-px h-8 bg-white/10" />
+                <div className="text-center">
+                  <div className="text-purple-300 font-bold text-sm md:text-base">
+                    {tarologo.total_consultas}
+                  </div>
+                  <div className="text-white/50 text-[10px] md:text-xs">
+                    Consultas
+                  </div>
+                </div>
+              </div>
+
+              {/* Status badge */}
+              <div
+                className={`px-4 py-1.5 rounded-full text-xs font-medium ${status.bgLight} ${status.text} border border-current/20 mb-4`}
+              >
+                {tarologo.status === "ocupado" && tarologo.minutosRestantes
+                  ? `⏱ ${tarologo.minutosRestantes} min restantes`
+                  : status.label}
+              </div>
+
+              {/* Botões */}
+              <div className="mt-auto w-full space-y-2">
+                {/* Admin controls */}
+                {isAdmin && (
+                  <div className="flex gap-1.5 mb-2">
+                    <button
+                      onClick={() => onChangeStatus?.("disponivel")}
+                      className={`flex-1 py-1.5 text-xs rounded-lg font-medium transition-all ${
+                        tarologo.status === "disponivel"
+                          ? "bg-green-500 text-white"
+                          : "bg-green-500/20 text-green-300 hover:bg-green-500/30"
+                      }`}
+                    >
+                      ✓
+                    </button>
+                    <button
+                      onClick={() => onChangeStatus?.("ocupado")}
+                      className={`flex-1 py-1.5 text-xs rounded-lg font-medium transition-all ${
+                        tarologo.status === "ocupado"
+                          ? "bg-yellow-500 text-white"
+                          : "bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30"
+                      }`}
+                    >
+                      ⏱
+                    </button>
+                    <button
+                      onClick={() => onChangeStatus?.("indisponivel")}
+                      className={`flex-1 py-1.5 text-xs rounded-lg font-medium transition-all ${
+                        tarologo.status === "indisponivel"
+                          ? "bg-red-500 text-white"
+                          : "bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                      }`}
+                    >
+                      ✕
+                    </button>
                   </div>
                 )}
+
+                {/* Ver Avaliações */}
+                <button
+                  onClick={() => setFlipped(true)}
+                  className="w-full py-2.5 rounded-xl font-medium text-center transition-all bg-white/10 hover:bg-white/20 text-white text-sm border border-white/10 hover:border-white/20"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <span>💬</span>
+                    <span>Ver Avaliações</span>
+                  </span>
+                </button>
+
+                {/* Consultar */}
+                <Link
+                  href={
+                    !usuarioLogado
+                      ? "/login"
+                      : !temMinutos
+                        ? "/comprar-minutos"
+                        : tarologo.status === "disponivel"
+                          ? `/solicitar-consulta?tarologo=${tarologo.id}`
+                          : "#"
+                  }
+                  className={`block w-full py-2.5 rounded-xl font-medium text-center transition-all text-sm ${
+                    tarologo.status === "disponivel" &&
+                    usuarioLogado &&
+                    temMinutos
+                      ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02]"
+                      : !usuarioLogado || !temMinutos
+                        ? "bg-purple-600/50 hover:bg-purple-600/70 text-white/90"
+                        : "bg-white/5 text-white/40 cursor-not-allowed"
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    {!usuarioLogado ? (
+                      <>
+                        <span>🔐</span>
+                        <span>Fazer login</span>
+                      </>
+                    ) : !temMinutos ? (
+                      <>
+                        <span>💎</span>
+                        <span>Comprar minutos</span>
+                      </>
+                    ) : tarologo.status === "disponivel" ? (
+                      <>
+                        <span>🔮</span>
+                        <span>Consultar agora</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>⏳</span>
+                        <span>Indisponível</span>
+                      </>
+                    )}
+                  </span>
+                </Link>
               </div>
-              {/* Status indicator */}
-              <div
-                className={`absolute bottom-0 right-1/2 transform translate-x-8 translate-y-1 w-5 h-5 ${status.bg} rounded-full border-2 border-gray-900 shadow-lg ${status.glow}`}
-              />
-            </div>
-
-            {/* Nome e Info */}
-            <h3 className="text-lg font-bold text-white text-center mb-1 truncate">
-              {tarologo.nome}
-            </h3>
-
-            {tarologo.especialidade && (
-              <p className="text-purple-300/80 text-xs text-center mb-2 truncate">
-                {tarologo.especialidade}
-              </p>
-            )}
-
-            {/* Stats */}
-            <div className="flex justify-center gap-4 mb-3 text-xs">
-              <div className="text-center">
-                <span className="text-yellow-400">⭐</span>
-                <span className="text-white/80 ml-1">
-                  {tarologo.avaliacao_media}
-                </span>
-              </div>
-              <div className="text-center">
-                <span className="text-purple-400">📖</span>
-                <span className="text-white/80 ml-1">
-                  {tarologo.total_consultas}
-                </span>
-              </div>
-            </div>
-
-            {/* Bio resumida */}
-            {tarologo.biografia && (
-              <p className="text-white/60 text-xs text-center line-clamp-2 mb-3 px-2">
-                {tarologo.biografia}
-              </p>
-            )}
-
-            {/* Status badge com timer */}
-            <div
-              className={`${status.bgLight} ${status.text} px-3 py-1.5 rounded-full text-xs font-medium text-center mb-3 mx-auto`}
-            >
-              {tarologo.status === "ocupado" && tarologo.minutosRestantes
-                ? `⏱ ${tarologo.minutosRestantes} min restantes`
-                : status.label}
-            </div>
-
-            {/* Botões */}
-            <div className="mt-auto w-full space-y-2">
-              {/* Admin controls */}
-              {isAdmin && (
-                <div className="flex gap-1.5 mb-2">
-                  <button
-                    onClick={() => onChangeStatus?.("disponivel")}
-                    className={`flex-1 py-1.5 text-xs rounded-lg font-medium transition-all ${
-                      tarologo.status === "disponivel"
-                        ? "bg-green-500 text-white"
-                        : "bg-green-500/20 text-green-300 hover:bg-green-500/30"
-                    }`}
-                  >
-                    ✓
-                  </button>
-                  <button
-                    onClick={handleOcupadoClick}
-                    className={`flex-1 py-1.5 text-xs rounded-lg font-medium transition-all ${
-                      tarologo.status === "ocupado"
-                        ? "bg-yellow-500 text-white"
-                        : "bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30"
-                    }`}
-                  >
-                    ⏱
-                  </button>
-                  <button
-                    onClick={() => onChangeStatus?.("indisponivel")}
-                    className={`flex-1 py-1.5 text-xs rounded-lg font-medium transition-all ${
-                      tarologo.status === "indisponivel"
-                        ? "bg-red-500 text-white"
-                        : "bg-red-500/20 text-red-300 hover:bg-red-500/30"
-                    }`}
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-
-              {/* Ver Avaliações */}
-              <button
-                onClick={() => setFlipped(true)}
-                className="w-full py-2.5 rounded-xl font-medium text-center transition-all bg-white/10 hover:bg-white/20 text-white text-sm border border-white/10 hover:border-white/20"
-              >
-                <span className="flex items-center justify-center gap-2">
-                  <span>💬</span>
-                  <span>Ver Avaliações</span>
-                </span>
-              </button>
-
-              {/* Consultar */}
-              <Link
-                href={
-                  !usuarioLogado
-                    ? "/login"
-                    : !temMinutos
-                      ? "/comprar-minutos"
-                      : tarologo.status === "disponivel"
-                        ? `/solicitar-consulta?tarologo=${tarologo.id}`
-                        : "#"
-                }
-                className={`block w-full py-2.5 rounded-xl font-medium text-center transition-all text-sm ${
-                  tarologo.status === "disponivel" &&
-                  usuarioLogado &&
-                  temMinutos
-                    ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/25"
-                    : "bg-white/5 text-white/40 cursor-not-allowed"
-                }`}
-              >
-                {!usuarioLogado
-                  ? "Fazer login"
-                  : !temMinutos
-                    ? "Comprar minutos"
-                    : tarologo.status === "disponivel"
-                      ? "✨ Consultar"
-                      : "Indisponível"}
-              </Link>
             </div>
           </div>
         </div>
 
         {/* VERSO DO CARD (Avaliações) */}
         <div className="absolute w-full h-full backface-hidden rotate-y-180">
-          <div className="bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-sm rounded-2xl p-5 border border-white/20 h-full flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-white">
-                Avaliações de {tarologo.nome}
-              </h3>
-              <button
-                onClick={() => setFlipped(false)}
-                className="text-white/60 hover:text-white text-xl"
-              >
-                ✕
-              </button>
-            </div>
+          <div className="relative bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm rounded-2xl border border-white/10 h-full flex flex-col overflow-hidden">
+            {/* Header bar */}
+            <div className="h-1 w-full bg-gradient-to-r from-purple-500 to-pink-500" />
 
-            <div className="text-center mb-4 pb-3 border-b border-white/10">
-              <div className="text-2xl font-bold text-yellow-400">
-                ⭐ {tarologo.avaliacao_media}
+            <div className="p-5 md:p-6 flex flex-col h-full">
+              {/* Header */}
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+                  <span>⭐</span>
+                  <span>Avaliações</span>
+                </h3>
+                <button
+                  onClick={() => setFlipped(false)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white flex items-center justify-center transition-all"
+                >
+                  ✕
+                </button>
               </div>
-              <div className="text-white/60 text-sm">
-                {avaliacoes.length} avaliações
-              </div>
-            </div>
 
-            {loading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-white/60">Carregando...</div>
-              </div>
-            ) : avaliacoes.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-white/60 text-center">
-                  <div className="text-3xl mb-2">📝</div>
-                  <div>Nenhuma avaliação ainda</div>
+              {/* Rating summary */}
+              <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl p-4 mb-4 border border-yellow-500/20">
+                <div className="flex items-center justify-center gap-3">
+                  <div className="text-4xl font-bold text-yellow-400">
+                    {tarologo.avaliacao_media}
+                  </div>
+                  <div>
+                    <div className="text-yellow-400 text-lg">
+                      {"★".repeat(Math.round(tarologo.avaliacao_media))}
+                      {"☆".repeat(5 - Math.round(tarologo.avaliacao_media))}
+                    </div>
+                    <div className="text-white/60 text-xs">
+                      {avaliacoes.length} avaliações
+                    </div>
+                  </div>
                 </div>
               </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
-                {avaliacoes.map((av, i) => (
-                  <div
-                    key={i}
-                    className="bg-white/5 rounded-xl p-3 border border-white/10"
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-medium text-white text-sm">
-                        {av.usuario_nome}
-                      </span>
-                      <span className="text-yellow-400 text-sm">
-                        {"⭐".repeat(av.estrelas)}
-                      </span>
-                    </div>
-                    {av.comentario && (
-                      <p className="text-white/70 text-xs leading-relaxed">
-                        {av.comentario}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
 
-            <button
-              onClick={() => setFlipped(false)}
-              className="mt-4 w-full py-2.5 rounded-xl font-medium text-center transition-all bg-white/10 hover:bg-white/20 text-white text-sm border border-white/10"
-            >
-              ← Voltar
-            </button>
+              {/* Lista de avaliações */}
+              {loading ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-2xl mb-2 animate-pulse">🔮</div>
+                    <div className="text-white/60 text-sm">Carregando...</div>
+                  </div>
+                </div>
+              ) : avaliacoes.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center text-white/50">
+                    <div className="text-3xl mb-2">💭</div>
+                    <p className="text-sm">Nenhuma avaliação ainda</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
+                  {avaliacoes.map((avaliacao, index) => (
+                    <div
+                      key={index}
+                      className="bg-white/5 hover:bg-white/10 rounded-xl p-3 border border-white/5 transition-colors"
+                    >
+                      <div className="flex justify-between items-start mb-1.5">
+                        <span className="text-white font-medium text-sm flex items-center gap-1.5">
+                          <span className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-[10px]">
+                            {avaliacao.usuario_nome.charAt(0)}
+                          </span>
+                          {avaliacao.usuario_nome}
+                        </span>
+                        <div className="text-yellow-400 text-xs">
+                          {"★".repeat(avaliacao.estrelas)}
+                        </div>
+                      </div>
+                      {avaliacao.comentario && (
+                        <p className="text-white/60 text-xs italic pl-8">
+                          &quot;{avaliacao.comentario}&quot;
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Botão voltar */}
+              <button
+                onClick={() => setFlipped(false)}
+                className="mt-4 w-full py-2.5 rounded-xl font-medium text-center transition-all bg-white/10 hover:bg-white/20 text-white text-sm border border-white/10"
+              >
+                ← Voltar ao perfil
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* MODAL DE SELEÇÃO DE TEMPO */}
-      {mostrarModalTempo && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-2xl p-6 border border-white/20 w-full max-w-sm shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-              <span>⏱</span> Definir Tempo de Atendimento
-            </h3>
-            <p className="text-white/60 text-sm mb-4">
-              Escolha quanto tempo{" "}
-              <strong className="text-yellow-300">{tarologo.nome}</strong>{" "}
-              ficará em atendimento. Após esse tempo, o status mudará
-              automaticamente para{" "}
-              <span className="text-red-400">indisponível</span>.
-            </p>
-
-            {/* Opções rápidas */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {opcoesTempoRapido.map((min) => (
-                <button
-                  key={min}
-                  onClick={() => {
-                    setTempoSelecionado(min);
-                    setTempoCustomizado("");
-                  }}
-                  className={`py-3 rounded-lg font-medium text-sm transition-all ${
-                    tempoSelecionado === min && tempoCustomizado === ""
-                      ? "bg-yellow-500 text-black"
-                      : "bg-white/10 text-white hover:bg-white/20"
-                  }`}
-                >
-                  {min} min
-                </button>
-              ))}
-            </div>
-
-            {/* Tempo customizado */}
-            <div className="mb-4">
-              <label className="text-white/70 text-sm mb-1 block">
-                Ou digite um tempo personalizado:
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  max="480"
-                  value={tempoCustomizado}
-                  onChange={(e) => {
-                    setTempoCustomizado(e.target.value);
-                  }}
-                  placeholder="Ex: 45"
-                  className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:border-yellow-500"
-                />
-                <span className="flex items-center text-white/60">minutos</span>
-              </div>
-            </div>
-
-            {/* Preview do tempo */}
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
-              <div className="text-center">
-                <span className="text-white/60 text-sm">
-                  Tempo selecionado:
-                </span>
-                <div className="text-2xl font-bold text-yellow-400">
-                  {tempoCustomizado !== ""
-                    ? parseInt(tempoCustomizado) || 0
-                    : tempoSelecionado}{" "}
-                  minutos
-                </div>
-              </div>
-            </div>
-
-            {/* Botões de ação */}
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setMostrarModalTempo(false);
-                  setTempoSelecionado(30);
-                  setTempoCustomizado("");
-                }}
-                className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white font-medium rounded-lg transition-all"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmarTempo}
-                disabled={
-                  (tempoCustomizado !== "" &&
-                    parseInt(tempoCustomizado) <= 0) ||
-                  (tempoCustomizado === "" && tempoSelecionado <= 0)
-                }
-                className="flex-1 py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Confirmar ⏱
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <style jsx>{`
+        .perspective-1000 {
+          perspective: 1000px;
+        }
+        .transform-style-3d {
+          transform-style: preserve-3d;
+        }
+        .backface-hidden {
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+          transform: rotateY(180deg);
+        }
+        .border-3 {
+          border-width: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, #a855f7, #ec4899);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(to bottom, #9333ea, #db2777);
+        }
+      `}</style>
     </div>
   );
 }
