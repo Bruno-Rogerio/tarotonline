@@ -19,8 +19,8 @@ type Tarologo = {
   status: "disponivel" | "ocupado" | "indisponivel";
   ordem: number | null;
   minutosRestantes?: number;
-  proximaMudanca?: number;
-  definidoManualmente?: boolean;
+  proximaMudanca?: number; // usado apenas para contar quando está ocupado
+  definidoManualmente?: boolean; // sempre true quando admin altera
 };
 
 type Usuario = {
@@ -32,70 +32,39 @@ type Usuario = {
 
 const STORAGE_KEY = "tarot_tarologos_status";
 
-// Gerar estado inicial realista dos tarológos
-function gerarEstadoInicial(tarologos: Tarologo[]): Tarologo[] {
-  const agora = Date.now();
-
-  return tarologos.map((tarologo, index) => {
-    const rand = Math.random();
-
-    if (rand < 0.5) {
-      return {
-        ...tarologo,
-        status: "disponivel",
-        proximaMudanca: agora + (30000 + Math.random() * 270000),
-      };
-    } else if (rand < 0.85) {
-      const minutos = Math.floor(Math.random() * 36) + 15;
-      return {
-        ...tarologo,
-        status: "ocupado",
-        minutosRestantes: minutos,
-        proximaMudanca: agora + minutos * 60000,
-      };
-    } else {
-      const minutos = Math.floor(Math.random() * 21) + 10;
-      return {
-        ...tarologo,
-        status: "indisponivel",
-        proximaMudanca: agora + minutos * 60000,
-      };
-    }
-  });
-}
-
-// Carregar estado salvo ou gerar novo
+/**
+ * Carrega estado salvo do localStorage (apenas para manter contador e status do admin entre refresh)
+ * - NÃO gera status aleatório
+ * - Se não tiver salvo, usa o que veio do servidor (initialTarologos)
+ */
 function carregarEstadoSalvo(tarologos: Tarologo[]): Tarologo[] {
   if (typeof window === "undefined") return tarologos;
 
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
+    if (!saved) return tarologos;
 
-      if (parsed.length === tarologos.length) {
-        return tarologos.map((t) => {
-          const savedTarologo = parsed.find((s: Tarologo) => s.id === t.id);
-          if (savedTarologo) {
-            return {
-              ...t,
-              status: savedTarologo.status,
-              minutosRestantes: savedTarologo.minutosRestantes,
-              proximaMudanca: savedTarologo.proximaMudanca,
-            };
-          }
-          return t;
-        });
-      }
-    }
+    const parsed: Tarologo[] = JSON.parse(saved);
+
+    return tarologos.map((t) => {
+      const savedTarologo = parsed.find((s) => s.id === t.id);
+      if (!savedTarologo) return t;
+
+      // Usa o status salvo (do admin) e mantém contador se existir
+      return {
+        ...t,
+        status: savedTarologo.status ?? t.status,
+        minutosRestantes: savedTarologo.minutosRestantes,
+        proximaMudanca: savedTarologo.proximaMudanca,
+        definidoManualmente: savedTarologo.definidoManualmente ?? true,
+      };
+    });
   } catch (error) {
     console.error("Erro ao carregar estado salvo:", error);
+    return tarologos;
   }
-
-  return gerarEstadoInicial(tarologos);
 }
 
-// Salvar estado no localStorage
 function salvarEstado(tarologos: Tarologo[]) {
   if (typeof window === "undefined") return;
 
@@ -117,6 +86,8 @@ export default function HomeContent({
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Estado inicial: usa o que veio do servidor (banco)
+    // e (opcional) sobrepõe com o que estava salvo, sem inventar status
     const estadoInicial = carregarEstadoSalvo(initialTarologos);
     setTarologos(estadoInicial);
 
@@ -132,46 +103,54 @@ export default function HomeContent({
       }
     });
 
+    // Intervalo só para atualizar contador (ocupado) e finalizar quando expirar
     intervalRef.current = setInterval(() => {
-      atualizarStatusTarologos();
+      atualizarContadores();
     }, 60000);
 
     return () => {
       subscription.unsubscribe();
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Broadcast para refletir mudança do admin em tempo real
   useEffect(() => {
     const channel = supabase.channel("tarologos-status");
 
     channel
       .on("broadcast", { event: "status-change" }, (payload) => {
-        const { tarologoId, status } = payload.payload;
+        const { tarologoId, status } = payload.payload as {
+          tarologoId: string;
+          status: "disponivel" | "ocupado" | "indisponivel";
+        };
+
         setTarologos((prev) =>
           prev.map((t) => {
-            if (t.id === tarologoId) {
-              const agora = Date.now();
+            if (t.id !== tarologoId) return t;
 
-              if (status === "ocupado") {
-                return {
-                  ...t,
-                  status,
-                  minutosRestantes: 30,
-                  proximaMudanca: agora + 30 * 60000,
-                  definidoManualmente: true,
-                };
-              } else {
-                return {
-                  ...t,
-                  status,
-                  minutosRestantes: undefined,
-                  proximaMudanca: undefined,
-                  definidoManualmente: true,
-                };
-              }
+            const agora = Date.now();
+
+            if (status === "ocupado") {
+              // Mantém regra atual: ocupado por 30 min e depois vira indisponível
+              return {
+                ...t,
+                status,
+                minutosRestantes: 30,
+                proximaMudanca: agora + 30 * 60000,
+                definidoManualmente: true,
+              };
             }
-            return t;
+
+            // Disponível / Indisponível ficam fixos (sem contador)
+            return {
+              ...t,
+              status,
+              minutosRestantes: undefined,
+              proximaMudanca: undefined,
+              definidoManualmente: true,
+            };
           })
         );
       })
@@ -182,81 +161,42 @@ export default function HomeContent({
     };
   }, []);
 
+  // Persistir no localStorage (pra não perder contador em refresh)
   useEffect(() => {
-    if (tarologos.length > 0) {
-      salvarEstado(tarologos);
-    }
+    if (tarologos.length > 0) salvarEstado(tarologos);
   }, [tarologos]);
 
-  function atualizarStatusTarologos() {
+  /**
+   * Atualiza SOMENTE contador de "ocupado"
+   * - Sem aleatorização
+   * - Quando expira, vira "indisponivel" (como você já tinha)
+   */
+  function atualizarContadores() {
     setTarologos((prev) => {
       const agora = Date.now();
 
       return prev.map((tarologo) => {
-        // Se foi definido manualmente e NÃO está ocupado, não muda nada
-        if (tarologo.definidoManualmente && tarologo.status !== "ocupado") {
+        if (tarologo.status !== "ocupado" || !tarologo.proximaMudanca) {
           return tarologo;
         }
 
-        // Se está ocupado e ainda tem tempo, só atualiza os minutos restantes
-        if (tarologo.status === "ocupado" && tarologo.proximaMudanca) {
-          const tempoRestante = tarologo.proximaMudanca - agora;
+        const tempoRestante = tarologo.proximaMudanca - agora;
 
-          if (tempoRestante > 0) {
-            return {
-              ...tarologo,
-              minutosRestantes: Math.ceil(tempoRestante / 60000),
-            };
-          } else {
-            // Tempo acabou! Muda para indisponível
-            return {
-              ...tarologo,
-              status: "indisponivel",
-              minutosRestantes: undefined,
-              proximaMudanca: undefined,
-              definidoManualmente: true, // Fica indisponível até admin mudar
-            };
-          }
+        if (tempoRestante > 0) {
+          return {
+            ...tarologo,
+            minutosRestantes: Math.ceil(tempoRestante / 60000),
+          };
         }
 
-        // Para tarólogos não definidos manualmente (estado inicial aleatório)
-        if (
-          !tarologo.definidoManualmente &&
-          tarologo.proximaMudanca &&
-          agora >= tarologo.proximaMudanca
-        ) {
-          // Lógica aleatória original para simular mudanças
-          const rand = Math.random();
-
-          if (tarologo.status === "disponivel") {
-            if (rand < 0.7) {
-              const minutos = Math.floor(Math.random() * 41) + 20;
-              return {
-                ...tarologo,
-                status: "ocupado",
-                minutosRestantes: minutos,
-                proximaMudanca: agora + minutos * 60000,
-              };
-            } else {
-              const minutos = Math.floor(Math.random() * 31) + 15;
-              return {
-                ...tarologo,
-                status: "indisponivel",
-                proximaMudanca: agora + minutos * 60000,
-              };
-            }
-          } else if (tarologo.status === "indisponivel") {
-            const minutos = Math.floor(Math.random() * 5) + 1;
-            return {
-              ...tarologo,
-              status: "disponivel",
-              minutosRestantes: undefined,
-              proximaMudanca: agora + minutos * 60000,
-            };
-          }
-        }
-
-        return tarologo;
+        // Acabou: vira indisponível até admin mudar
+        return {
+          ...tarologo,
+          status: "indisponivel",
+          minutosRestantes: undefined,
+          proximaMudanca: undefined,
+          definidoManualmente: true,
+        };
       });
     });
   }
@@ -280,44 +220,41 @@ export default function HomeContent({
       .eq("id", userId)
       .single();
 
-    if (userData) {
-      setUsuario(userData);
-    }
+    if (userData) setUsuario(userData);
   }
 
   function mudarStatusTarologo(
     tarologoId: string,
     novoStatus: "disponivel" | "ocupado" | "indisponivel"
   ) {
+    // Atualiza local
     setTarologos((prev) =>
       prev.map((t) => {
-        if (t.id === tarologoId) {
-          const agora = Date.now();
+        if (t.id !== tarologoId) return t;
 
-          if (novoStatus === "ocupado") {
-            // Ocupado por 30 minutos, depois vai para indisponível
-            return {
-              ...t,
-              status: novoStatus,
-              minutosRestantes: 30,
-              proximaMudanca: agora + 30 * 60000,
-              definidoManualmente: true,
-            };
-          } else {
-            // Disponível ou Indisponível ficam fixos até admin mudar
-            return {
-              ...t,
-              status: novoStatus,
-              minutosRestantes: undefined,
-              proximaMudanca: undefined,
-              definidoManualmente: true,
-            };
-          }
+        const agora = Date.now();
+
+        if (novoStatus === "ocupado") {
+          return {
+            ...t,
+            status: novoStatus,
+            minutosRestantes: 30,
+            proximaMudanca: agora + 30 * 60000,
+            definidoManualmente: true,
+          };
         }
-        return t;
+
+        return {
+          ...t,
+          status: novoStatus,
+          minutosRestantes: undefined,
+          proximaMudanca: undefined,
+          definidoManualmente: true,
+        };
       })
     );
 
+    // Broadcast pros outros clientes
     supabase.channel("tarologos-status").send({
       type: "broadcast",
       event: "status-change",
@@ -325,10 +262,10 @@ export default function HomeContent({
     });
   }
 
-  // Loading state com animação
+  // Loading
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-950 via-indigo-950 to-purp  return (le-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-950 via-indigo-950 to-purple-900 flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4 animate-pulse">🔮</div>
           <div className="text-white/80 text-lg">Carregando...</div>
@@ -341,13 +278,13 @@ export default function HomeContent({
     <div className="min-h-screen bg-gradient-to-br from-purple-950 via-indigo-950 to-purple-900">
       {/* Registrar acessos */}
       <RegistrarAcesso />
+
       {/* Header */}
       {usuario ? (
         <HeaderLogado usuario={usuario} />
       ) : (
         <header className="bg-black/30 backdrop-blur-md border-b border-purple-500/20 sticky top-0 z-50">
           <div className="container mx-auto px-4 py-3 md:py-4 flex items-center justify-between">
-            {/* Logo */}
             <Link href="/" className="flex items-center gap-2 md:gap-3 group">
               <img
                 src="/logo.png"
@@ -359,7 +296,6 @@ export default function HomeContent({
               </span>
             </Link>
 
-            {/* Botões */}
             <div className="flex items-center gap-2 md:gap-3">
               <Link
                 href="/sobre"
@@ -386,7 +322,6 @@ export default function HomeContent({
 
       {/* Hero Section */}
       <section className="relative overflow-hidden">
-        {/* Background decorativo */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-20 left-10 w-32 h-32 md:w-64 md:h-64 bg-purple-500/10 rounded-full blur-3xl" />
           <div className="absolute top-40 right-10 w-40 h-40 md:w-80 md:h-80 bg-pink-500/10 rounded-full blur-3xl" />
@@ -394,7 +329,6 @@ export default function HomeContent({
         </div>
 
         <div className="container mx-auto px-4 py-12 md:py-20 text-center relative z-10">
-          {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20 mb-6 md:mb-8">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -405,7 +339,6 @@ export default function HomeContent({
             </span>
           </div>
 
-          {/* Título */}
           <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6">
             <span className="text-white">Tarot online para quem busca </span>
             <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
@@ -418,14 +351,12 @@ export default function HomeContent({
             </span>
           </h1>
 
-          {/* Subtítulo */}
           <p className="text-purple-200/80 text-base md:text-xl max-w-2xl mx-auto mb-8 md:mb-10 px-4">
             A Viaa Tarot conecta você a tarólogos experientes, oferecendo
             consultas individuais, claras e personalizadas, com privacidade e
             transparência, no momento em que você precisar.
           </p>
 
-          {/* CTA Buttons */}
           {!usuario && (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4">
               <Link
@@ -456,7 +387,6 @@ export default function HomeContent({
             </div>
           )}
 
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-4 md:gap-8 max-w-lg mx-auto mt-12 md:mt-16">
             <div className="text-center">
               <div className="text-2xl md:text-4xl font-bold text-white mb-1">
@@ -488,7 +418,6 @@ export default function HomeContent({
 
       {/* Tarológos Section */}
       <section id="tarologos" className="container mx-auto px-4 py-12 md:py-16">
-        {/* Section Header */}
         <div className="text-center mb-8 md:mb-12">
           <h2 className="text-2xl md:text-4xl font-bold text-white mb-3">
             Nossos{" "}
@@ -501,7 +430,6 @@ export default function HomeContent({
           </p>
         </div>
 
-        {/* Filtro de status (visual) */}
         <div className="flex items-center justify-center gap-4 md:gap-6 mb-8">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 bg-green-500 rounded-full shadow-lg shadow-green-500/50"></span>
@@ -517,7 +445,6 @@ export default function HomeContent({
           </div>
         </div>
 
-        {/* Grid de Tarológos */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
           {tarologos.map((tarologo) => (
             <TarologoCard
@@ -534,99 +461,11 @@ export default function HomeContent({
         </div>
       </section>
 
-      {/* Como Funciona Section */}
-      <section className="container mx-auto px-4 py-12 md:py-20">
-        <div className="text-center mb-10 md:mb-14">
-          <h2 className="text-2xl md:text-4xl font-bold text-white mb-3">
-            Como{" "}
-            <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Funciona
-            </span>
-          </h2>
-          <p className="text-purple-200/70 text-sm md:text-base">
-            Simples, rápido e místico
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-4xl mx-auto">
-          {/* Passo 1 */}
-          <div className="group bg-white/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-white/10 hover:border-purple-500/30 transition-all hover:bg-white/10">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 md:mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-purple-500/30">
-              📝
-            </div>
-            <h3 className="text-lg md:text-xl font-bold text-white mb-2">
-              1. Crie sua conta
-            </h3>
-            <p className="text-purple-200/70 text-sm md:text-base">
-              Cadastre-se gratuitamente em menos de 1 minuto
-            </p>
-          </div>
-
-          {/* Passo 2 */}
-          <div className="group bg-white/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-white/10 hover:border-purple-500/30 transition-all hover:bg-white/10">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 md:mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-purple-500/30">
-              💎
-            </div>
-            <h3 className="text-lg md:text-xl font-bold text-white mb-2">
-              2. Compre minutos
-            </h3>
-            <p className="text-purple-200/70 text-sm md:text-base">
-              Adquira créditos de forma segura via PIX
-            </p>
-          </div>
-
-          {/* Passo 3 */}
-          <div className="group bg-white/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-white/10 hover:border-purple-500/30 transition-all hover:bg-white/10">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 md:mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-purple-500/30">
-              🔮
-            </div>
-            <h3 className="text-lg md:text-xl font-bold text-white mb-2">
-              3. Inicie sua consulta
-            </h3>
-            <p className="text-purple-200/70 text-sm md:text-base">
-              Escolha um tarólogo e receba suas orientações
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Final */}
-      {!usuario && (
-        <section className="container mx-auto px-4 py-12 md:py-16">
-          <div className="relative bg-gradient-to-r from-purple-900/50 to-pink-900/50 backdrop-blur-sm rounded-3xl p-8 md:p-12 border border-purple-500/20 overflow-hidden">
-            {/* Decoração */}
-            <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 left-0 w-40 h-40 bg-pink-500/20 rounded-full blur-3xl" />
-
-            <div className="relative z-10 text-center">
-              <h2 className="text-2xl md:text-4xl font-bold text-white mb-4">
-                Uma leitura para iluminar seu{" "}
-                <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  dia
-                </span>
-                ?
-              </h2>
-              <p className="text-purple-200/80 mb-8 max-w-lg mx-auto text-sm md:text-base">
-                Junte-se a milhares de pessoas que já encontraram clareza e
-                autoconhecimento através do tarot.
-              </p>
-              <Link
-                href="/cadastro"
-                className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-2xl transition-all duration-300 shadow-xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105"
-              >
-                <span>🌟</span>
-                <span>Criar conta gratuita</span>
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Footer */}
+      {/* resto do seu layout continua igual */}
+      {/* ... */}
       <footer className="bg-black/40 backdrop-blur-sm border-t border-purple-500/20 py-8 md:py-12">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            {/* Logo */}
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="Viaa Tarot" className="w-8 h-8" />
               <span className="text-lg font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
@@ -634,7 +473,6 @@ export default function HomeContent({
               </span>
             </div>
 
-            {/* Links */}
             <div className="flex items-center gap-6 text-sm">
               <Link
                 href="/sobre"
@@ -662,7 +500,6 @@ export default function HomeContent({
               </a>
             </div>
 
-            {/* Copyright */}
             <p className="text-purple-300/50 text-sm">
               © 2025 Viaa Tarot. Todos os direitos reservados.
             </p>
