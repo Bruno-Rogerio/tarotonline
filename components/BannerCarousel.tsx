@@ -150,14 +150,14 @@ export default function BannerCarousel({
   return (
     <div
       ref={containerRef}
-      className="w-full px-4 my-6 md:my-8"
+      className="w-full my-6 md:my-8"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="relative w-full max-w-5xl mx-auto h-40 sm:h-48 md:h-64 lg:h-80">
+      <div className="relative w-full h-36 sm:h-44 md:h-56 lg:h-72">
         {/* Banner principal */}
         {currentBanner.link_url ? (
           <Link
