@@ -7,11 +7,11 @@ export default function WhatsAppButton() {
   const [mostrarTooltip, setMostrarTooltip] = useState(false);
 
   // COLOQUE SEU NÚMERO AQUI (com código do país, sem espaços ou símbolos)
-  const numeroWhatsApp = "5511995391337"; // Ex: 5511999999999
+  const numeroWhatsApp = "5511915194173"; // Ex: 5511999999999
   const mensagemPadrao = "Olá! Preciso de ajuda com o Viaa Tarot.";
 
   const linkWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(
-    mensagemPadrao
+    mensagemPadrao,
   )}`;
 
   const handleClick = () => {

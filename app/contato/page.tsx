@@ -9,14 +9,14 @@ export default function ContatoPage() {
   const [assunto, setAssunto] = useState("");
   const [mensagem, setMensagem] = useState("");
 
-  const numeroWhatsApp = "5511995391337";
+  const numeroWhatsApp = "5511915194173";
 
   function abrirWhatsApp() {
     const texto = `Olá! Meu nome é ${nome || "[seu nome]"}.\n\nAssunto: ${
       assunto || "[assunto]"
     }\n\n${mensagem || "[sua mensagem]"}`;
     const url = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(
-      texto
+      texto,
     )}`;
     window.open(url, "_blank");
   }
@@ -25,7 +25,7 @@ export default function ContatoPage() {
     const emailDestino = "viaatarot@gmail.com";
     const assuntoEmail = encodeURIComponent(assunto || "Contato via site");
     const corpoEmail = encodeURIComponent(
-      `Nome: ${nome}\nE-mail: ${email}\n\nMensagem:\n${mensagem}`
+      `Nome: ${nome}\nE-mail: ${email}\n\nMensagem:\n${mensagem}`,
     );
     window.location.href = `mailto:${emailDestino}?subject=${assuntoEmail}&body=${corpoEmail}`;
   }

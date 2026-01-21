@@ -41,11 +41,11 @@ export default function SobrePage() {
     { icon: "🕊️", texto: "Respeito ao livre-arbítrio" },
   ];
 
-  const numeroWhatsApp = "5511995391337";
+  const numeroWhatsApp = "5511915194173";
   const mensagemTarologa =
     "Olá! Sou tarólogo e gostaria de saber mais sobre como fazer parte da plataforma Viaa Tarot.";
   const linkWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(
-    mensagemTarologa
+    mensagemTarologa,
   )}`;
 
   return (
