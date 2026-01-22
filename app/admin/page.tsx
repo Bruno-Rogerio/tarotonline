@@ -551,14 +551,14 @@ export default function AdminPage() {
 
               <Link
                 href="/admin/banners"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-pink-500/10 border border-pink-500/20 text-pink-400 rounded-lg text-sm hover:bg-pink-500/20 transition-all"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 border border-purple-500/20 text-purple-300 rounded-lg text-sm hover:bg-purple-500/20 transition-all"
               >
                 🖼️ Gerenciar Banners
               </Link>
 
               <Link
                 href="/admin/horoscopo"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-pink-500/10 border border-pink-500/20 text-pink-400 rounded-lg text-sm hover:bg-pink-500/20 transition-all"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-violet-500/10 border border-violet-500/20 text-violet-300 rounded-lg text-sm hover:bg-violet-500/20 transition-all"
               >
                 🔮 Horóscopo do Dia
               </Link>
@@ -575,7 +575,7 @@ export default function AdminPage() {
               {/* Link Cupons */}
               <Link
                 href="/admin/cupons"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-pink-500/10 border border-pink-500/20 text-pink-400 rounded-lg text-sm hover:bg-pink-500/20 transition-all"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded-lg text-sm hover:bg-indigo-500/20 transition-all"
               >
                 <span>🎟️</span>
                 <span>Cupons</span>
