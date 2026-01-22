@@ -549,14 +549,6 @@ export default function AdminPage() {
                 </button>
               )}
 
-              {/* Link Cupons */}
-              <Link
-                href="/admin/cupons"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-pink-500/10 border border-pink-500/20 text-pink-400 rounded-lg text-sm hover:bg-pink-500/20 transition-all"
-              >
-                <span>🎟️</span>
-                <span>Cupons</span>
-              </Link>
               <Link
                 href="/admin/banners"
                 className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-pink-500/10 border border-pink-500/20 text-pink-400 rounded-lg text-sm hover:bg-pink-500/20 transition-all"
@@ -580,6 +572,14 @@ export default function AdminPage() {
                 <span>Promoções</span>
               </Link>
 
+              {/* Link Cupons */}
+              <Link
+                href="/admin/cupons"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-pink-500/10 border border-pink-500/20 text-pink-400 rounded-lg text-sm hover:bg-pink-500/20 transition-all"
+              >
+                <span>🎟️</span>
+                <span>Cupons</span>
+              </Link>
               <Link
                 href="/"
                 className="text-white/50 hover:text-white text-sm px-3 py-1.5"
