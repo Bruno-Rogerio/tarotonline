@@ -566,7 +566,7 @@ export default function AdminPage() {
 
               <Link
                 href="/admin/horoscopo"
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-pink-500/10 border border-pink-500/20 text-pink-400 rounded-lg text-sm hover:bg-pink-500/20 transition-all"
               >
                 🔮 Horóscopo do Dia
               </Link>
